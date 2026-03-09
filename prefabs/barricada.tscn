@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://dgtaqhipmvh8k"]
+
+[ext_resource type="Script" uid="uid://eg0t2k1mexqd" path="res://scripts/barricada.gd" id="1_413fb"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b5s61"]
+albedo_color = Color(0.19215687, 0.08627451, 0.2784314, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_413fb"]
+material = SubResource("StandardMaterial3D_b5s61")
+size = Vector3(2, 1, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ui3xg"]
+size = Vector3(2, 1, 2)
+
+[node name="Barricada" type="StaticBody3D" unique_id=14374711 groups=["barricadas"]]
+script = ExtResource("1_413fb")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1293988881]
+mesh = SubResource("BoxMesh_413fb")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2070079544]
+shape = SubResource("BoxShape3D_ui3xg")

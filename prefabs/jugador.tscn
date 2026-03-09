@@ -1,0 +1,46 @@
+[gd_scene format=3 uid="uid://x4o6yry24vgu"]
+
+[ext_resource type="Script" uid="uid://cqeu0hj0e1xcy" path="res://scripts/jugador.gd" id="1_3di4i"]
+[ext_resource type="Resource" uid="uid://d2vxfr6c1clvt" path="res://materials/pistola.tres" id="2_rkjra"]
+[ext_resource type="PackedScene" uid="uid://b4c423omi1dem" path="res://prefabs/bala.tscn" id="3_ynpdv"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3di4i"]
+albedo_color = Color(0.25882354, 0.41568628, 0.38431373, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_odh3o"]
+material = SubResource("StandardMaterial3D_3di4i")
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_g87hm"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_3di4i"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_3di4i"]
+
+[node name="jugador" type="CharacterBody3D" unique_id=1185021812 groups=["jugador"]]
+collision_layer = 2
+collision_mask = 5
+script = ExtResource("1_3di4i")
+arma_actual = ExtResource("2_rkjra")
+bala_escena = ExtResource("3_ynpdv")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=837636698]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("CapsuleMesh_odh3o")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D" unique_id=1800111713]
+shape = SubResource("CapsuleShape3D_g87hm")
+
+[node name="Nariz" type="MeshInstance3D" parent="MeshInstance3D" unique_id=1976440086]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0.5, 0.4)
+mesh = SubResource("BoxMesh_3di4i")
+
+[node name="PuntoCamara" type="Marker3D" parent="." unique_id=894970970]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1565868669]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("CapsuleShape3D_3di4i")
+
+[node name="PuntoDisparo" type="Marker3D" parent="." unique_id=570713313]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.020758629, 1.0207925, 1.3457129)
+gizmo_extents = 1.0

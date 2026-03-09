@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://dkg3pc5sfq4a2"]
+
+[ext_resource type="Script" uid="uid://c6vqddrh24osb" path="res://scripts/zombie.gd" id="1_85317"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0s52v"]
+albedo_color = Color(0, 0.77254903, 0.007843138, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_85317"]
+material = SubResource("StandardMaterial3D_0s52v")
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_vlph1"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_kewk0"]
+
+[node name="zombie" type="CharacterBody3D" unique_id=1060371809 groups=["enemigos"]]
+collision_layer = 4
+collision_mask = 7
+script = ExtResource("1_85317")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1988323598]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("CylinderMesh_85317")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="MeshInstance3D" unique_id=898319314]
+transform = Transform3D(0.3, 0, 0, 0, -1.3113417e-08, 0.3, 0, -0.3, -1.3113417e-08, 0, 0.5, -0.5)
+mesh = SubResource("CapsuleMesh_vlph1")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1776203756 groups=["enemigos"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("CylinderShape3D_kewk0")

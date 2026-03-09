@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ArmaData" format=3 uid="uid://d2vxfr6c1clvt"]
+
+[ext_resource type="Script" uid="uid://54rjamw0wjhd" path="res://scripts/arma_data.gd" id="1_psl1f"]
+
+[resource]
+script = ExtResource("1_psl1f")
+nombre = "Pistola 9mm"
+dispersion = 1.0
+metadata/_custom_type_script = "uid://54rjamw0wjhd"
