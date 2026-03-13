@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ArmaData" format=3 uid="uid://bmgkbic11suvw"]
+
+[ext_resource type="Script" uid="uid://54rjamw0wjhd" path="res://scripts/arma_data.gd" id="1_mj8sh"]
+
+[resource]
+script = ExtResource("1_mj8sh")
+nombre = "Rifle de Caza"
+dano = 45
+cadencia = 1.2
+tamano_cargador = 5
+tiempo_recarga = 2.0
+dispersion = 0.5
+penetra_enemigos = true
+metadata/_custom_type_script = "uid://54rjamw0wjhd"

@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://x4o6yry24vgu"]
 
 [ext_resource type="Script" uid="uid://cqeu0hj0e1xcy" path="res://scripts/jugador.gd" id="1_3di4i"]
-[ext_resource type="Resource" uid="uid://d2vxfr6c1clvt" path="res://materials/pistola.tres" id="2_rkjra"]
 [ext_resource type="PackedScene" uid="uid://b4c423omi1dem" path="res://prefabs/bala.tscn" id="3_ynpdv"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3di4i"]
@@ -20,7 +19,6 @@ material = SubResource("StandardMaterial3D_3di4i")
 collision_layer = 2
 collision_mask = 5
 script = ExtResource("1_3di4i")
-arma_actual = ExtResource("2_rkjra")
 bala_escena = ExtResource("3_ynpdv")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=837636698]

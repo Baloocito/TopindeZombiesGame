@@ -1,0 +1,52 @@
+[gd_scene format=3 uid="uid://bq5n5d1j54h1u"]
+
+[ext_resource type="Script" uid="uid://bdpyy6acghwj" path="res://scripts/torreta.gd" id="1_2u65d"]
+[ext_resource type="PackedScene" uid="uid://b4c423omi1dem" path="res://prefabs/bala.tscn" id="2_lbef0"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_2qml6"]
+size = Vector3(0.5, 1.5, 0.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2u65d"]
+size = Vector3(0.5, 1.5, 0.5115967)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_lbef0"]
+top_radius = 0.08
+bottom_radius = 0.2
+height = 0.2
+radial_segments = 65
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_vciry"]
+height = 3.0
+radius = 10.0
+
+[node name="Torreta" type="StaticBody3D" unique_id=278846004 groups=["barricadas"]]
+script = ExtResource("1_2u65d")
+bala_escena = ExtResource("2_lbef0")
+
+[node name="Base" type="MeshInstance3D" parent="." unique_id=33228244]
+transform = Transform3D(-1, -8.742278e-08, 0, 8.742278e-08, -1, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("BoxMesh_2qml6")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=63847424]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0.00579834)
+shape = SubResource("BoxShape3D_2u65d")
+
+[node name="Cabezal" type="Node3D" parent="." unique_id=145507221]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Cabezal" unique_id=1760278200]
+mesh = SubResource("CylinderMesh_lbef0")
+
+[node name="PuntoDisparo" type="Marker3D" parent="Cabezal" unique_id=919244462]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.088, -0.7922642)
+
+[node name="AreaDeteccion" type="Area3D" parent="." unique_id=125572084]
+collision_mask = 4
+input_ray_pickable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AreaDeteccion" unique_id=352536127]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("CylinderShape3D_vciry")
+
+[connection signal="body_entered" from="AreaDeteccion" to="." method="_on_area_deteccion_body_entered"]
+[connection signal="body_exited" from="AreaDeteccion" to="." method="_on_area_deteccion_body_exited"]

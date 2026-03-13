@@ -5,10 +5,11 @@
 [resource]
 script = ExtResource("1_255u5")
 nombre = "Escopeta doble"
+tipo_municion = "Pesada"
 dano = 12
 cadencia = 0.8
 tamano_cargador = 2
 tiempo_recarga = 2.5
 balas_por_disparo = 6
-dispersion = 25.0
+dispersion = 15.0
 metadata/_custom_type_script = "uid://54rjamw0wjhd"

@@ -1,5 +1,7 @@
 extends StaticBody3D
 
+# Identificador para la tienda y las reparaciones
+var tipo_estructura: String = ""
 @export var salud_maxima: int = 5 
 var salud_actual: int
 

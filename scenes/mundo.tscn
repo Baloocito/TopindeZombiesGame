@@ -8,16 +8,52 @@
 [ext_resource type="PackedScene" uid="uid://0bgijxgy4tay" path="res://prefabs/caja_municion.tscn" id="2_m7g0u"]
 [ext_resource type="Texture2D" uid="uid://piifkx0sqtne" path="res://icon.svg" id="3_0vka0"]
 [ext_resource type="PackedScene" uid="uid://ds47qlx1j1ffj" path="res://prefabs/botiquin.tscn" id="3_35q48"]
-[ext_resource type="Script" uid="uid://cpisew677hxbq" path="res://scripts/base_joystick.gd" id="4_75jji"]
-[ext_resource type="Script" uid="uid://cqjildqn41ub2" path="res://scripts/base_joystick_apuntado.gd" id="4_yi5ae"]
+[ext_resource type="Script" uid="uid://cpisew677hxbq" path="res://scripts/joystick.gd" id="4_75jji"]
+[ext_resource type="PackedScene" uid="uid://bq5n5d1j54h1u" path="res://prefabs/torreta.tscn" id="6_35q48"]
 [ext_resource type="PackedScene" uid="uid://dkg3pc5sfq4a2" path="res://prefabs/zombie.tscn" id="6_jaeu2"]
 [ext_resource type="Script" uid="uid://dtvkdu4w1x5hc" path="res://scripts/generador_zombies.gd" id="9_6o2rw"]
+[ext_resource type="PackedScene" uid="uid://dvcku8wub5drg" path="res://scenes/menu_pausa.tscn" id="13_cae5a"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_a2ps7"]
 size = Vector2(50, 50)
 
 [sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_0vka0"]
 data = PackedVector3Array(25, 0, 25, -25, 0, 25, 25, 0, -25, -25, 0, 25, -25, 0, -25, 25, 0, -25)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_35q48"]
+bg_color = Color(0.10980392, 0.10980392, 0.10980392, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.13725491, 0.14901961, 0.1882353, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cae5a"]
+bg_color = Color(0, 0.8352941, 0.4509804, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_l7i8s"]
+bg_color = Color(0.10980392, 0.10980392, 0.10980392, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.13725491, 0.14901961, 0.16470589, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_f7ym0"]
+bg_color = Color(0.05882353, 1, 1, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_w7nu4"]
+bg_color = Color(0.10980392, 0.10980392, 0.10980392, 1)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0.27450982, 0.19607843, 0.19607843, 1)
+corner_detail = 9
+expand_margin_left = 10.0
+expand_margin_top = 5.0
+expand_margin_right = 10.0
+expand_margin_bottom = 5.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_06eai"]
 transparency = 1
@@ -36,7 +72,12 @@ script = ExtResource("1_75jji")
 caja_municion_escena = ExtResource("2_m7g0u")
 botiquin_escena = ExtResource("3_35q48")
 moneda_escena = ExtResource("2_06eai")
-barricada_escena = ExtResource("2_kxyy5")
+escena_madera = ExtResource("2_kxyy5")
+escena_puas = ExtResource("2_kxyy5")
+escena_barril = ExtResource("2_kxyy5")
+escena_acero = ExtResource("2_kxyy5")
+escena_electrico = ExtResource("2_kxyy5")
+escena_torreta = ExtResource("6_35q48")
 
 [node name="Suelo" type="MeshInstance3D" parent="." unique_id=143945657]
 transform = Transform3D(0.9999999, -0.00038436413, 0.00022595376, 0.00038440115, 0.9999999, -0.00015251298, -0.00022589415, 0.00015260623, 1, 0, 0, 0)
@@ -67,68 +108,100 @@ margen_abajo = -10.0
 
 [node name="JoystickVirtual" type="Control" parent="InterfazUI" unique_id=335846182]
 layout_mode = 3
-anchors_preset = 0
-offset_left = 180.0
-offset_top = 380.0
-offset_right = 220.0
-offset_bottom = 420.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
 
 [node name="base" type="TextureRect" parent="InterfazUI/JoystickVirtual" unique_id=1357180860]
-layout_mode = 0
-offset_right = 128.0
-offset_bottom = 128.0
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.128
+anchor_top = 0.62700003
+anchor_right = 0.26200002
+anchor_bottom = 0.864
+offset_left = -0.4560089
+offset_top = -0.2960205
+offset_right = 0.17596436
+offset_bottom = 0.12799072
 texture = ExtResource("3_0vka0")
+expand_mode = 1
+stretch_mode = 5
 script = ExtResource("4_75jji")
 
 [node name="Palanca" type="TextureRect" parent="InterfazUI/JoystickVirtual/base" unique_id=548833180]
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.508
-anchor_top = 0.508
-anchor_right = 0.508
-anchor_bottom = 0.508
-offset_left = -32.024002
-offset_top = -32.024002
-offset_right = 95.976
-offset_bottom = 95.976
+anchor_left = 0.7578125
+anchor_top = 0.7578125
+anchor_right = 0.7578125
+anchor_bottom = 0.7578125
+offset_left = -61.5625
+offset_top = -61.5625
+offset_right = 18.4375
+offset_bottom = 18.4375
+grow_horizontal = 2
+grow_vertical = 2
 scale = Vector2(0.5, 0.5)
+mouse_filter = 2
 texture = ExtResource("3_0vka0")
+expand_mode = 1
+stretch_mode = 5
+metadata/_edit_use_anchors_ = true
 
 [node name="JoystickApuntado" type="Control" parent="InterfazUI" unique_id=516615421]
 layout_mode = 3
-anchors_preset = 0
-offset_left = 180.0
-offset_top = 380.0
-offset_right = 220.0
-offset_bottom = 420.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
 
 [node name="base" type="TextureRect" parent="InterfazUI/JoystickApuntado" unique_id=587554713]
-layout_mode = 0
-offset_left = 650.0
-offset_right = 778.0
-offset_bottom = 128.0
+layout_mode = 1
+anchors_preset = -1
+offset_left = 344.0
+offset_top = 98.0
+offset_right = 494.0
+offset_bottom = 248.0
 texture = ExtResource("3_0vka0")
-script = ExtResource("4_yi5ae")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("4_75jji")
+accion_izq = "apuntar_izq"
+accion_der = "apuntar_der"
+accion_arriba = "apuntar_arriba"
+accion_abajo = "apuntar_abajo"
 
 [node name="Palanca" type="TextureRect" parent="InterfazUI/JoystickApuntado/base" unique_id=1559305662]
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.508
-anchor_top = 0.508
-anchor_right = 0.508
-anchor_bottom = 0.508
-offset_left = -32.024002
-offset_top = -32.024002
-offset_right = 95.976
-offset_bottom = 95.976
+anchor_left = 0.7734375
+anchor_top = 0.7265625
+anchor_right = 0.7734375
+anchor_bottom = 0.7265625
+offset_left = -64.6875
+offset_top = -55.3125
+offset_right = 15.3125
+offset_bottom = 24.6875
+grow_horizontal = 2
+grow_vertical = 2
 scale = Vector2(0.5, 0.5)
 texture = ExtResource("3_0vka0")
+expand_mode = 1
+stretch_mode = 5
+metadata/_edit_use_anchors_ = true
 
 [node name="BotonConstruir" type="Button" parent="InterfazUI" unique_id=1966088576]
-offset_left = 900.0
-offset_top = 250.0
-offset_right = 1096.0
-offset_bottom = 286.0
+offset_left = 904.0
+offset_top = 140.0
+offset_right = 1100.0
+offset_bottom = 176.0
 tooltip_text = "Modo Construcción"
 theme_override_font_sizes/font_size = 20
 text = "Modo Construcción"
@@ -151,37 +224,28 @@ offset_bottom = 103.0
 text = "¡Iniciar Noche!"
 
 [node name="TextoAnuncio" type="Label" parent="InterfazUI" unique_id=1609147582]
-offset_left = 190.0
-offset_top = 142.0
-offset_right = 900.0
-offset_bottom = 337.0
+offset_left = 304.0
+offset_top = 336.0
+offset_right = 816.0
+offset_bottom = 405.0
 theme_override_colors/font_color = Color(0.7882353, 0.6392157, 0.44705883, 1)
 theme_override_font_sizes/font_size = 50
 text = "Fase de Preparacion"
 
 [node name="TextoDinero" type="Label" parent="InterfazUI" unique_id=5879219]
-offset_left = 971.0
-offset_top = 134.0
-offset_right = 1131.0
-offset_bottom = 176.0
+offset_left = 886.0
+offset_top = 15.0
+offset_right = 1046.0
+offset_bottom = 57.0
 theme_override_font_sizes/font_size = 30
 text = "$0"
 
 [node name="BotonReparar" type="Button" parent="InterfazUI" unique_id=1540342012]
-offset_left = 922.0
-offset_top = 294.0
-offset_right = 1074.0
-offset_bottom = 338.0
+offset_left = 918.0
+offset_top = 205.0
+offset_right = 1070.0
+offset_bottom = 249.0
 text = "Reparar todo!"
-
-[node name="TextoVida" type="Label" parent="InterfazUI" unique_id=485586881]
-offset_left = 58.0
-offset_top = 570.0
-offset_right = 167.0
-offset_bottom = 617.0
-theme_override_colors/font_color = Color(0.05490196, 0.95686275, 0.43529412, 1)
-theme_override_font_sizes/font_size = 30
-text = "VIDA"
 
 [node name="TextoGameOver" type="Label" parent="InterfazUI" unique_id=503818781]
 visible = false
@@ -211,20 +275,185 @@ theme_override_font_sizes/font_size = 25
 text = "Arma: 30/30"
 
 [node name="BotonRecargar" type="Button" parent="InterfazUI" unique_id=684845595]
-offset_left = 767.0
-offset_top = 285.0
-offset_right = 882.0
-offset_bottom = 328.0
+offset_left = 986.0
+offset_top = 362.0
+offset_right = 1101.0
+offset_bottom = 405.0
 theme_override_font_sizes/font_size = 25
 text = "Recargar"
 
 [node name="BotonCambiarArma" type="Button" parent="InterfazUI" unique_id=1754701221]
-offset_left = 475.0
-offset_top = 578.0
-offset_right = 657.0
-offset_bottom = 625.0
+offset_left = 694.0
+offset_top = 438.0
+offset_right = 876.0
+offset_bottom = 485.0
 theme_override_font_sizes/font_size = 25
 text = "Cambiar Arma"
+
+[node name="PanelLateral" type="Panel" parent="InterfazUI" unique_id=30432391]
+visible = false
+offset_left = 743.0
+offset_top = -1.0
+offset_right = 1153.0
+offset_bottom = 647.0
+
+[node name="MenuArmeria" type="VBoxContainer" parent="InterfazUI/PanelLateral" unique_id=1377747868]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuConstruccion" type="VBoxContainer" parent="InterfazUI/PanelLateral" unique_id=1521848310]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuInspector" type="VBoxContainer" parent="InterfazUI/PanelLateral" unique_id=1313999073]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuNivel" type="VBoxContainer" parent="InterfazUI/PanelLateral" unique_id=472674603]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BotonCerrar" type="Button" parent="InterfazUI/PanelLateral" unique_id=735360589]
+layout_mode = 0
+offset_left = 343.0
+offset_top = 6.0
+offset_right = 389.0
+offset_bottom = 60.0
+theme_override_font_sizes/font_size = 33
+text = "X"
+
+[node name="BotonMochila" type="Button" parent="InterfazUI" unique_id=2084222365]
+offset_left = 740.0
+offset_top = 542.0
+offset_right = 868.0
+offset_bottom = 584.0
+theme_override_font_sizes/font_size = 24
+text = "Inventario"
+
+[node name="BotonNivel" type="Button" parent="InterfazUI" unique_id=1158499613]
+offset_left = 912.0
+offset_top = 265.0
+offset_right = 1061.0
+offset_bottom = 315.0
+theme_override_font_sizes/font_size = 25
+text = "Estadisticas"
+
+[node name="pausa" type="Button" parent="InterfazUI" unique_id=497399686]
+offset_left = 1107.0
+offset_top = 16.0
+offset_right = 1133.0
+offset_bottom = 47.0
+text = "||"
+
+[node name="HudEstadisticas" type="VBoxContainer" parent="InterfazUI" unique_id=1686257217]
+offset_right = 350.0
+offset_bottom = 100.0
+
+[node name="FilaSalud" type="HBoxContainer" parent="InterfazUI/HudEstadisticas" unique_id=1228482881]
+layout_mode = 2
+
+[node name="LblSaludText" type="Label" parent="InterfazUI/HudEstadisticas/FilaSalud" unique_id=548371615]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.05490196, 1, 0.14901961, 1)
+text = "SALUD"
+
+[node name="Control" type="Control" parent="InterfazUI/HudEstadisticas/FilaSalud" unique_id=76276101]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LblSaludNum" type="Label" parent="InterfazUI/HudEstadisticas/FilaSalud" unique_id=908317732]
+layout_mode = 2
+text = "100/100"
+
+[node name="BarraSalud" type="ProgressBar" parent="InterfazUI/HudEstadisticas" unique_id=2041754890]
+layout_mode = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_35q48")
+theme_override_styles/fill = SubResource("StyleBoxFlat_cae5a")
+show_percentage = false
+
+[node name="LblNivel" type="Label" parent="InterfazUI/HudEstadisticas" unique_id=881248012]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 1, 1, 1)
+text = "NIVEL 1"
+
+[node name="BarraXP" type="ProgressBar" parent="InterfazUI/HudEstadisticas" unique_id=1069290594]
+layout_mode = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_l7i8s")
+theme_override_styles/fill = SubResource("StyleBoxFlat_f7ym0")
+show_percentage = false
+
+[node name="ContenedorAlertas" type="VBoxContainer" parent="InterfazUI" unique_id=2066624411]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -87.0
+offset_top = 57.0
+offset_right = 87.0
+offset_bottom = 206.0
+grow_horizontal = 2
+theme_override_constants/separation = 50
+
+[node name="PanelFase" type="PanelContainer" parent="InterfazUI/ContenedorAlertas" unique_id=965862449]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_w7nu4")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="InterfazUI/ContenedorAlertas/PanelFase" unique_id=772654158]
+layout_mode = 2
+
+[node name="LblTituloFase" type="Label" parent="InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer" unique_id=663680718]
+layout_mode = 2
+text = "DÍA 1: PREPÁRATE"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CajaZombies" type="HBoxContainer" parent="InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer" unique_id=1583003117]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 8
+
+[node name="Icono" type="Label" parent="InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/CajaZombies" unique_id=65300647]
+layout_mode = 2
+text = "💀"
+
+[node name="LblZombies" type="Label" parent="InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/CajaZombies" unique_id=1696849329]
+layout_mode = 2
+size_flags_horizontal = 4
+text = "0"
+
+[node name="PanelNivelUp" type="VBoxContainer" parent="InterfazUI/ContenedorAlertas" unique_id=1476482268]
+visible = false
+layout_mode = 2
+
+[node name="LblNivelTitulo" type="Label" parent="InterfazUI/ContenedorAlertas/PanelNivelUp" unique_id=1707214423]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9019608, 0, 1)
+theme_override_font_sizes/font_size = 35
+text = "¡NIVEL UP!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LblPuntos" type="Label" parent="InterfazUI/ContenedorAlertas/PanelNivelUp" unique_id=1149315120]
+layout_mode = 2
+text = "+3 Puntos de Mejora"
+horizontal_alignment = 1
+vertical_alignment = 2
 
 [node name="Holograma" type="MeshInstance3D" parent="." unique_id=2019692501]
 visible = false
@@ -235,6 +464,7 @@ mesh = SubResource("BoxMesh_75jji")
 script = ExtResource("9_6o2rw")
 zombie_basico = ExtResource("6_jaeu2")
 zombie_corredor = ExtResource("6_jaeu2")
+zombie_explosivo = ExtResource("6_jaeu2")
 zombie_tanque = ExtResource("6_jaeu2")
 zombie_boss = ExtResource("6_jaeu2")
 
@@ -253,10 +483,17 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.007378, 0, 0)
 [node name="TimerSpawn" type="Timer" parent="GeneradorZombies" unique_id=133095249]
 wait_time = 2.0
 
+[node name="MenuPausa" parent="." unique_id=59542981 instance=ExtResource("13_cae5a")]
+visible = false
+
 [connection signal="pressed" from="InterfazUI/BotonConstruir" to="." method="alternar_modo_construccion"]
 [connection signal="pressed" from="InterfazUI/BotonIniciar" to="." method="iniciar_oleada"]
 [connection signal="pressed" from="InterfazUI/BotonReparar" to="." method="ejecutar_reparacion_global"]
 [connection signal="pressed" from="InterfazUI/BotonReiniciar" to="." method="_on_boton_reiniciar_pressed"]
 [connection signal="pressed" from="InterfazUI/BotonRecargar" to="jugador" method="_on_boton_recargar_pressed"]
-[connection signal="pressed" from="InterfazUI/BotonCambiarArma" to="jugador" method="_on_boton_cambiar_arma_pressed"]
+[connection signal="pressed" from="InterfazUI/BotonCambiarArma" to="jugador" method="ciclo_arma_rapido"]
+[connection signal="pressed" from="InterfazUI/PanelLateral/BotonCerrar" to="." method="_on_boton_cerrar_pressed"]
+[connection signal="pressed" from="InterfazUI/BotonMochila" to="." method="abrir_armeria"]
+[connection signal="pressed" from="InterfazUI/BotonNivel" to="." method="_on_boton_nivel_pressed"]
+[connection signal="pressed" from="InterfazUI/pausa" to="." method="_on_boton_pausa_tactil_pressed"]
 [connection signal="timeout" from="GeneradorZombies/TimerSpawn" to="GeneradorZombies" method="generar_zombie"]

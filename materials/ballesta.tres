@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ArmaData" format=3 uid="uid://dneygka2gys00"]
+
+[ext_resource type="Script" uid="uid://54rjamw0wjhd" path="res://scripts/arma_data.gd" id="1_wyswb"]
+
+[resource]
+script = ExtResource("1_wyswb")
+nombre = "Ballesta Expl."
+tipo_municion = "Pesada"
+dano = 20
+cadencia = 0.6
+tamano_cargador = 1
+tiempo_recarga = 2.2
+dispersion = 1.0
+dano_area = 60
+metadata/_custom_type_script = "uid://54rjamw0wjhd"

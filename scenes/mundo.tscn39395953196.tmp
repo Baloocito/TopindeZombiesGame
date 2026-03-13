@@ -1,0 +1,378 @@
+[gd_scene format=3 uid="uid://ra2auq5ikrhs"]
+
+[ext_resource type="Script" uid="uid://3go54ardypmo" path="res://scripts/mundo.gd" id="1_75jji"]
+[ext_resource type="PackedScene" uid="uid://x4o6yry24vgu" path="res://prefabs/jugador.tscn" id="1_wqn8j"]
+[ext_resource type="PackedScene" uid="uid://cp626lbkpkoiw" path="res://prefabs/moneda.tscn" id="2_06eai"]
+[ext_resource type="Script" uid="uid://dswdf4sowauqj" path="res://scripts/camera_3d.gd" id="2_a2ps7"]
+[ext_resource type="PackedScene" uid="uid://dgtaqhipmvh8k" path="res://prefabs/barricada.tscn" id="2_kxyy5"]
+[ext_resource type="PackedScene" uid="uid://0bgijxgy4tay" path="res://prefabs/caja_municion.tscn" id="2_m7g0u"]
+[ext_resource type="Texture2D" uid="uid://piifkx0sqtne" path="res://icon.svg" id="3_0vka0"]
+[ext_resource type="PackedScene" uid="uid://ds47qlx1j1ffj" path="res://prefabs/botiquin.tscn" id="3_35q48"]
+[ext_resource type="Script" uid="uid://cpisew677hxbq" path="res://scripts/joystick.gd" id="4_75jji"]
+[ext_resource type="PackedScene" uid="uid://bq5n5d1j54h1u" path="res://prefabs/torreta.tscn" id="6_35q48"]
+[ext_resource type="PackedScene" uid="uid://dkg3pc5sfq4a2" path="res://prefabs/zombie.tscn" id="6_jaeu2"]
+[ext_resource type="Script" uid="uid://dtvkdu4w1x5hc" path="res://scripts/generador_zombies.gd" id="9_6o2rw"]
+[ext_resource type="PackedScene" uid="uid://dvcku8wub5drg" path="res://scenes/menu_pausa.tscn" id="13_cae5a"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_a2ps7"]
+size = Vector2(50, 50)
+
+[sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_0vka0"]
+data = PackedVector3Array(25, 0, 25, -25, 0, 25, 25, 0, -25, -25, 0, 25, -25, 0, -25, 25, 0, -25)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_06eai"]
+transparency = 1
+albedo_color = Color(0, 1, 0, 0.4745098)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jaeu2"]
+transparency = 1
+albedo_color = Color(0, 1, 1, 0.47058824)
+
+[sub_resource type="BoxMesh" id="BoxMesh_75jji"]
+material = SubResource("StandardMaterial3D_jaeu2")
+size = Vector3(2, 1, 2)
+
+[node name="Mundo" type="Node3D" unique_id=745953541]
+script = ExtResource("1_75jji")
+caja_municion_escena = ExtResource("2_m7g0u")
+botiquin_escena = ExtResource("3_35q48")
+moneda_escena = ExtResource("2_06eai")
+escena_madera = ExtResource("2_kxyy5")
+escena_puas = ExtResource("2_kxyy5")
+escena_barril = ExtResource("2_kxyy5")
+escena_acero = ExtResource("2_kxyy5")
+escena_electrico = ExtResource("2_kxyy5")
+escena_torreta = ExtResource("6_35q48")
+
+[node name="Suelo" type="MeshInstance3D" parent="." unique_id=143945657]
+transform = Transform3D(0.9999999, -0.00038436413, 0.00022595376, 0.00038440115, 0.9999999, -0.00015251298, -0.00022589415, 0.00015260623, 1, 0, 0, 0)
+mesh = SubResource("PlaneMesh_a2ps7")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Suelo" unique_id=196990872]
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Suelo/StaticBody3D" unique_id=36694145]
+shape = SubResource("ConcavePolygonShape3D_0vka0")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=897977415]
+transform = Transform3D(0.71017545, -0.6892503, -0.14347368, 0.6514401, 0.56606066, 0.5051748, -0.266977, -0.45222718, 0.8510074, 0.21735963, 11.092817, 0.7218034)
+
+[node name="jugador" parent="." unique_id=1185021812 instance=ExtResource("1_wqn8j")]
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1681848175 node_paths=PackedStringArray("objetivo")]
+transform = Transform3D(1, 0, 0, 0, 0.7547096, 0.6560591, 0, -0.656059, 0.7547097, 0, 10, 0)
+size = 25.0
+script = ExtResource("2_a2ps7")
+objetivo = NodePath("../jugador")
+margen_izquierdo = 5.0
+margen_derecho = 4.0
+margen_arriba = 9.0
+margen_abajo = -10.0
+
+[node name="InterfazUI" type="CanvasLayer" parent="." unique_id=1191662003]
+
+[node name="JoystickVirtual" type="Control" parent="InterfazUI" unique_id=335846182]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="base" type="TextureRect" parent="InterfazUI/JoystickVirtual" unique_id=1357180860]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.18900001
+anchor_top = 0.568
+anchor_right = 0.3
+anchor_bottom = 0.76500005
+offset_left = 32.271988
+offset_top = 7.935974
+offset_right = 54.399994
+offset_bottom = 30.279968
+texture = ExtResource("3_0vka0")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("4_75jji")
+
+[node name="Palanca" type="TextureRect" parent="InterfazUI/JoystickVirtual/base" unique_id=548833180]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.7578125
+anchor_top = 0.7578125
+anchor_right = 0.7578125
+anchor_bottom = 0.7578125
+offset_left = -61.5625
+offset_top = -61.5625
+offset_right = 18.4375
+offset_bottom = 18.4375
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(0.5, 0.5)
+mouse_filter = 2
+texture = ExtResource("3_0vka0")
+expand_mode = 1
+stretch_mode = 5
+metadata/_edit_use_anchors_ = true
+
+[node name="JoystickApuntado" type="Control" parent="InterfazUI" unique_id=516615421]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+
+[node name="base" type="TextureRect" parent="InterfazUI/JoystickApuntado" unique_id=587554713]
+layout_mode = 1
+anchors_preset = -1
+offset_left = 231.0
+offset_top = 31.0
+offset_right = 381.0
+offset_bottom = 181.0
+texture = ExtResource("3_0vka0")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("4_75jji")
+accion_izq = "apuntar_izq"
+accion_der = "apuntar_der"
+accion_arriba = "apuntar_arriba"
+accion_abajo = "apuntar_abajo"
+
+[node name="Palanca" type="TextureRect" parent="InterfazUI/JoystickApuntado/base" unique_id=1559305662]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.7734375
+anchor_top = 0.7265625
+anchor_right = 0.7734375
+anchor_bottom = 0.7265625
+offset_left = -64.6875
+offset_top = -55.3125
+offset_right = 15.3125
+offset_bottom = 24.6875
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("3_0vka0")
+expand_mode = 1
+stretch_mode = 5
+metadata/_edit_use_anchors_ = true
+
+[node name="BotonConstruir" type="Button" parent="InterfazUI" unique_id=1966088576]
+offset_left = 900.0
+offset_top = 250.0
+offset_right = 1096.0
+offset_bottom = 286.0
+tooltip_text = "Modo Construcción"
+theme_override_font_sizes/font_size = 20
+text = "Modo Construcción"
+
+[node name="TextoEstado" type="Label" parent="InterfazUI" unique_id=1489294882]
+visible = false
+offset_left = 39.0
+offset_top = 20.0
+offset_right = 235.0
+offset_bottom = 48.0
+theme_override_font_sizes/font_size = 20
+text = "Fase de Preparación"
+horizontal_alignment = 1
+
+[node name="BotonIniciar" type="Button" parent="InterfazUI" unique_id=2106588159]
+offset_left = 955.0
+offset_top = 53.0
+offset_right = 1092.0
+offset_bottom = 103.0
+text = "¡Iniciar Noche!"
+
+[node name="TextoAnuncio" type="Label" parent="InterfazUI" unique_id=1609147582]
+offset_left = 329.0
+offset_top = 180.0
+offset_right = 841.0
+offset_bottom = 249.0
+theme_override_colors/font_color = Color(0.7882353, 0.6392157, 0.44705883, 1)
+theme_override_font_sizes/font_size = 50
+text = "Fase de Preparacion"
+
+[node name="TextoDinero" type="Label" parent="InterfazUI" unique_id=5879219]
+offset_left = 971.0
+offset_top = 134.0
+offset_right = 1131.0
+offset_bottom = 176.0
+theme_override_font_sizes/font_size = 30
+text = "$0"
+
+[node name="BotonReparar" type="Button" parent="InterfazUI" unique_id=1540342012]
+offset_left = 922.0
+offset_top = 294.0
+offset_right = 1074.0
+offset_bottom = 338.0
+text = "Reparar todo!"
+
+[node name="TextoVida" type="Label" parent="InterfazUI" unique_id=485586881]
+offset_left = 58.0
+offset_top = 570.0
+offset_right = 167.0
+offset_bottom = 617.0
+theme_override_colors/font_color = Color(0.05490196, 0.95686275, 0.43529412, 1)
+theme_override_font_sizes/font_size = 30
+text = "VIDA"
+
+[node name="TextoGameOver" type="Label" parent="InterfazUI" unique_id=503818781]
+visible = false
+offset_left = 207.0
+offset_top = 213.0
+offset_right = 906.0
+offset_bottom = 350.0
+theme_override_colors/font_color = Color(0.79607844, 0, 0, 1)
+theme_override_font_sizes/font_size = 100
+text = "¡HAS MUERTO!"
+
+[node name="BotonReiniciar" type="Button" parent="InterfazUI" unique_id=538405564]
+visible = false
+offset_left = 457.0
+offset_top = 375.0
+offset_right = 682.0
+offset_bottom = 444.0
+theme_override_font_sizes/font_size = 30
+text = "REINTENTAR!"
+
+[node name="TextoMunicion" type="Label" parent="InterfazUI" unique_id=145775733]
+offset_left = 936.0
+offset_top = 558.0
+offset_right = 1082.0
+offset_bottom = 593.0
+theme_override_font_sizes/font_size = 25
+text = "Arma: 30/30"
+
+[node name="BotonRecargar" type="Button" parent="InterfazUI" unique_id=684845595]
+offset_left = 767.0
+offset_top = 285.0
+offset_right = 882.0
+offset_bottom = 328.0
+theme_override_font_sizes/font_size = 25
+text = "Recargar"
+
+[node name="BotonCambiarArma" type="Button" parent="InterfazUI" unique_id=1754701221]
+offset_left = 475.0
+offset_top = 578.0
+offset_right = 657.0
+offset_bottom = 625.0
+theme_override_font_sizes/font_size = 25
+text = "Cambiar Arma"
+
+[node name="PanelLateral" type="Panel" parent="InterfazUI" unique_id=30432391]
+visible = false
+offset_left = 743.0
+offset_top = -1.0
+offset_right = 1153.0
+offset_bottom = 647.0
+
+[node name="MenuArmeria" type="VBoxContainer" parent="InterfazUI/PanelLateral" unique_id=1377747868]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuConstruccion" type="VBoxContainer" parent="InterfazUI/PanelLateral" unique_id=1521848310]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuInspector" type="VBoxContainer" parent="InterfazUI/PanelLateral" unique_id=1313999073]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuNivel" type="VBoxContainer" parent="InterfazUI/PanelLateral" unique_id=472674603]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BotonCerrar" type="Button" parent="InterfazUI/PanelLateral" unique_id=735360589]
+layout_mode = 0
+offset_left = 343.0
+offset_top = 6.0
+offset_right = 389.0
+offset_bottom = 60.0
+theme_override_font_sizes/font_size = 33
+text = "X"
+
+[node name="BotonMochila" type="Button" parent="InterfazUI" unique_id=2084222365]
+offset_left = 770.0
+offset_top = 577.0
+offset_right = 898.0
+offset_bottom = 619.0
+theme_override_font_sizes/font_size = 24
+text = "Inventario"
+
+[node name="BotonNivel" type="Button" parent="InterfazUI" unique_id=1158499613]
+offset_left = 56.0
+offset_top = 517.0
+offset_right = 198.0
+offset_bottom = 567.0
+theme_override_font_sizes/font_size = 25
+text = "Estadisticas"
+
+[node name="pausa" type="Button" parent="InterfazUI" unique_id=497399686]
+offset_left = 65.0
+offset_top = 48.0
+offset_right = 91.0
+offset_bottom = 79.0
+text = "||"
+
+[node name="Holograma" type="MeshInstance3D" parent="." unique_id=2019692501]
+visible = false
+material_override = SubResource("StandardMaterial3D_06eai")
+mesh = SubResource("BoxMesh_75jji")
+
+[node name="GeneradorZombies" type="Node3D" parent="." unique_id=314142817]
+script = ExtResource("9_6o2rw")
+zombie_basico = ExtResource("6_jaeu2")
+zombie_corredor = ExtResource("6_jaeu2")
+zombie_explosivo = ExtResource("6_jaeu2")
+zombie_tanque = ExtResource("6_jaeu2")
+zombie_boss = ExtResource("6_jaeu2")
+
+[node name="PuntoNorte" type="Marker3D" parent="GeneradorZombies" unique_id=61993626]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -23.457424)
+
+[node name="PuntoSur" type="Marker3D" parent="GeneradorZombies" unique_id=727748274]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 23.493)
+
+[node name="PuntoEste" type="Marker3D" parent="GeneradorZombies" unique_id=140752835]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.111454, 0, 0)
+
+[node name="PuntoOeste" type="Marker3D" parent="GeneradorZombies" unique_id=170170852]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.007378, 0, 0)
+
+[node name="TimerSpawn" type="Timer" parent="GeneradorZombies" unique_id=133095249]
+wait_time = 2.0
+
+[node name="MenuPausa" parent="." unique_id=59542981 instance=ExtResource("13_cae5a")]
+
+[connection signal="pressed" from="InterfazUI/BotonConstruir" to="." method="alternar_modo_construccion"]
+[connection signal="pressed" from="InterfazUI/BotonIniciar" to="." method="iniciar_oleada"]
+[connection signal="pressed" from="InterfazUI/BotonReparar" to="." method="ejecutar_reparacion_global"]
+[connection signal="pressed" from="InterfazUI/BotonReiniciar" to="." method="_on_boton_reiniciar_pressed"]
+[connection signal="pressed" from="InterfazUI/BotonRecargar" to="jugador" method="_on_boton_recargar_pressed"]
+[connection signal="pressed" from="InterfazUI/BotonCambiarArma" to="jugador" method="ciclo_arma_rapido"]
+[connection signal="pressed" from="InterfazUI/PanelLateral/BotonCerrar" to="." method="_on_boton_cerrar_pressed"]
+[connection signal="pressed" from="InterfazUI/BotonMochila" to="." method="abrir_armeria"]
+[connection signal="pressed" from="InterfazUI/BotonNivel" to="." method="_on_boton_nivel_pressed"]
+[connection signal="timeout" from="GeneradorZombies/TimerSpawn" to="GeneradorZombies" method="generar_zombie"]

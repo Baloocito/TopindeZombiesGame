@@ -1,0 +1,36 @@
+[gd_scene format=3 uid="uid://dvcku8wub5drg"]
+
+[ext_resource type="Script" uid="uid://dd46e8hsquwv8" path="res://scripts/menu_pausa.gd" id="1_jhjql"]
+
+[node name="MenuPausa" type="CanvasLayer" unique_id=59542981]
+process_mode = 3
+script = ExtResource("1_jhjql")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=631594726]
+offset_left = -19.0
+offset_top = -8.0
+offset_right = 1158.0
+offset_bottom = 671.0
+color = Color(1, 1, 1, 0.47843137)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=281534126]
+offset_left = 513.0
+offset_top = 268.0
+offset_right = 634.0
+offset_bottom = 402.0
+
+[node name="BotonReanudar" type="Button" parent="VBoxContainer" unique_id=30971520]
+layout_mode = 2
+text = "Reanudar"
+
+[node name="BotonOpciones" type="Button" parent="VBoxContainer" unique_id=306238349]
+layout_mode = 2
+text = "opciones"
+
+[node name="BotonAbandonar" type="Button" parent="VBoxContainer" unique_id=2025996028]
+layout_mode = 2
+text = "Abandonar"
+
+[connection signal="pressed" from="VBoxContainer/BotonReanudar" to="." method="_on_boton_reanudar_pressed"]
+[connection signal="pressed" from="VBoxContainer/BotonOpciones" to="." method="_on_boton_opciones_pressed"]
+[connection signal="pressed" from="VBoxContainer/BotonAbandonar" to="." method="_on_boton_abandonar_pressed"]

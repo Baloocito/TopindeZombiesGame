@@ -5,5 +5,6 @@
 [resource]
 script = ExtResource("1_psl1f")
 nombre = "Pistola 9mm"
-dispersion = 1.0
+tiempo_recarga = 1.2
+dispersion = 2.0
 metadata/_custom_type_script = "uid://54rjamw0wjhd"

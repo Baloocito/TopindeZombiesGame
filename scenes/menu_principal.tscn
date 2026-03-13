@@ -1,0 +1,62 @@
+[gd_scene format=3 uid="uid://c7q2ta6xhvchg"]
+
+[ext_resource type="Script" uid="uid://bx17adesjn5fr" path="res://scriptsmenu_principal.gd" id="1_i85hu"]
+
+[node name="MenuPrincipal" type="Control" unique_id=716806258]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_top = -11.0
+offset_right = 5.0
+offset_bottom = -11.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_i85hu")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=1395833901]
+layout_mode = 0
+offset_left = -23.0
+offset_top = -40.0
+offset_right = 1162.0
+offset_bottom = 678.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=2110514427]
+layout_mode = 1
+anchors_preset = -1
+offset_left = 429.0
+offset_top = 292.0
+offset_right = 701.0
+offset_bottom = 467.0
+
+[node name="BotonJugar" type="Button" parent="VBoxContainer" unique_id=369758257]
+layout_mode = 2
+text = "Jugar"
+
+[node name="BotonRanking" type="Button" parent="VBoxContainer" unique_id=1153206505]
+layout_mode = 2
+text = "Ranking"
+
+[node name="BotonOpciones" type="Button" parent="VBoxContainer" unique_id=674608752]
+layout_mode = 2
+text = "Opciones"
+
+[node name="BotonSalir" type="Button" parent="VBoxContainer" unique_id=882544380]
+layout_mode = 2
+text = "Salir"
+
+[node name="TextoProximamente" type="Label" parent="." unique_id=1723956807]
+layout_mode = 0
+offset_left = 273.0
+offset_top = 192.0
+offset_right = 851.0
+offset_bottom = 261.0
+theme_override_colors/font_color = Color(0.05882353, 0.043137256, 0.07058824, 1)
+theme_override_font_sizes/font_size = 50
+text = "TOPINDEZOMBIESGAME"
+
+[connection signal="pressed" from="VBoxContainer/BotonJugar" to="." method="_on_boton_jugar_pressed"]
+[connection signal="pressed" from="VBoxContainer/BotonRanking" to="." method="_on_boton_ranking_pressed"]
+[connection signal="pressed" from="VBoxContainer/BotonOpciones" to="." method="_on_boton_opciones_pressed"]
+[connection signal="pressed" from="VBoxContainer/BotonSalir" to="." method="_on_boton_salir_pressed"]

@@ -9,14 +9,9 @@ func _ready():
 func _process(delta):
 	rotate_y(2.0 * delta) # Que gire rápido para que lo veas en la urgencia
 
-func _al_recoger(cuerpo: Node3D):
+func _al_recoger(cuerpo):
 	if cuerpo.is_in_group("jugador"):
-		# ¡MAGIA TÁCTICA! Solo lo recogemos si nos falta vida
-		if cuerpo.salud_actual < cuerpo.salud_maxima:
-			if cuerpo.has_method("curar"):
-				cuerpo.curar(porcentaje_curacion)
-			
-			# Destruimos el botiquín del suelo
-			queue_free()
-		else:
-			print("Vida al máximo. Guardando botiquín para después.")
+		# Verificamos que el jugador tenga la función que actualiza la barra
+		if cuerpo.has_method("curar"):
+			cuerpo.curar(0.5) # Cura el 50% de su vida máxima actual (stat_salud_maxima)
+			queue_free() # Destruimos el botiquín

@@ -1,18 +1,33 @@
 extends Area3D
 
-var cantidad_balas: int = 0 # Lo que recarga por defecto
+var cantidad_balas: int = 30
+var tipo_municion: String = "Ligera"
 
-func _ready():
-	body_entered.connect(_al_recoger)
-
-func _process(delta):
-	rotate_y(1.5 * delta) # Que gire para llamar la atención
-
-func _al_recoger(cuerpo: Node3D):
-	if cuerpo.is_in_group("jugador"):
-		if cuerpo.has_method("recoger_municion"):
-			# Le pasamos las balas al jugador
-			cuerpo.recoger_municion(cantidad_balas)
+func configurar(tipo: String, cantidad: int):
+	tipo_municion = tipo
+	cantidad_balas = cantidad
+	
+	# 1. Creamos un material nuevo para pintarla
+	var material = StandardMaterial3D.new()
+	
+	# 2. Elegimos el color según tu GDD
+	if tipo == "Ligera":
+		material.albedo_color = Color(0, 0, 1) # Azul puro
+	elif tipo == "Pesada":
+		material.albedo_color = Color(0, 1, 0) # Verde puro
+	elif tipo == "Energia":
+		material.albedo_color = Color(1, 0, 0) # Rojo puro
+	else:
+		material.albedo_color = Color(1, 1, 1) # Blanco por si hay error
 		
-		# Destruimos la caja física
-		queue_free()
+	var modelo_visual = $MeshInstance3D
+	
+	if modelo_visual:
+		modelo_visual.material_override = material
+
+# Señal cuando el jugador la pisa
+func _on_body_entered(body):
+	if body.is_in_group("jugador"):
+		if body.has_method("recoger_municion"):
+			body.recoger_municion(cantidad_balas, tipo_municion)
+			queue_free() # Destruimos la caja
