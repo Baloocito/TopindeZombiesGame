@@ -21,10 +21,13 @@ var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 @onready var barra_salud = $"../InterfazUI/HudEstadisticas/BarraSalud"
 @onready var lbl_nivel = $"../InterfazUI/HudEstadisticas/LblNivel"
 @onready var barra_xp = $"../InterfazUI/HudEstadisticas/BarraXP"
-@onready var texto_municion = $"../InterfazUI/TextoMunicion" 
-@onready var boton_recargar = $"../InterfazUI/BotonRecargar" 
 @onready var panel_nivel_up = $"../InterfazUI/ContenedorAlertas/PanelNivelUp"
 @onready var lbl_puntos_mejora = $"../InterfazUI/ContenedorAlertas/PanelNivelUp/LblPuntos"
+# --- NUEVAS REFERENCIAS ARMAS (HUD Inferior Derecho) ---
+@onready var contenedor_armas = $"../InterfazUI/EsquinaArmas"
+@onready var lbl_nombre_arma = $"../InterfazUI/EsquinaArmas/HBoxContainer/PanelMunicion/VBoxContainer/LblNombreArma"
+@onready var lbl_balas = $"../InterfazUI/EsquinaArmas/HBoxContainer/PanelMunicion/VBoxContainer/LblBalas"
+@onready var boton_recargar = $"../InterfazUI/EsquinaArmas/HBoxContainer/CajaBotonesArma/BotonRecargar"
 var tween_nivel: Tween
 
 # ==========================================================
@@ -214,21 +217,31 @@ func actualizar_ui_xp():
 
 
 func actualizar_ui_municion():
-	if not texto_municion: return
+	# Medida de seguridad por si el nodo aún no carga
+	if not contenedor_armas: return
+	
+	# Si el jugador no tiene arma en la mano, ocultamos todo el panel
 	if not arma_actual:
-		texto_municion.visible = false
-		if boton_recargar: boton_recargar.visible = false
+		contenedor_armas.visible = false
 		return
 		
-	texto_municion.visible = true
-	if boton_recargar: boton_recargar.visible = true
+	# Si tiene arma, mostramos el panel
+	contenedor_armas.visible = true
 		
 	if esta_recargando:
-		texto_municion.text = "Recargando..."
+		lbl_nombre_arma.text = arma_actual.nombre
+		lbl_balas.text = "Recargando..."
+		lbl_balas.modulate = Color(1, 0.8, 0.2) # Color Amarillo/Naranja
 	else:
 		var tipo = arma_actual.tipo_municion
-		texto_municion.text = "%s\n%s / %s (%s)" % [arma_actual.nombre, balas_en_cargador, municion_reserva[tipo], tipo]
-
+		lbl_nombre_arma.text = arma_actual.nombre
+		lbl_balas.text = "%s / %s" % [balas_en_cargador, municion_reserva[tipo]]
+		
+		# Efecto visual: Si nos quedamos sin balas en el cargador, el texto se pone rojo
+		if balas_en_cargador == 0:
+			lbl_balas.modulate = Color(1, 0.2, 0.2)
+		else:
+			lbl_balas.modulate = Color.WHITE
 func recibir_dano(cantidad: int):
 	salud_actual -= cantidad
 	actualizar_ui_vida()
@@ -265,10 +278,6 @@ func subir_nivel():
 	actualizar_ui_vida()
 	actualizar_ui_xp() 
 	
-	var mundo = get_parent()
-	if "boton_nivel" in mundo and mundo.boton_nivel:
-		mundo.boton_nivel.modulate = Color(1, 1, 0)
-		mundo.boton_nivel.text = "¡NIVEL UP!"
 		
 	# ==========================================
 	# ¡NUEVO! ANIMACIÓN DE ALERTA DE NIVEL UP
