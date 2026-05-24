@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://cmgnqmsyyi1oh"]
+
+[ext_resource type="Script" uid="uid://c2dgbheoji7ru" path="res://scripts/plano_arma.gd" id="1_5i450"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_6tqnb"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_5i450"]
+size = Vector3(0.4, 0.4, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vqbw8"]
+emission_enabled = true
+emission = Color(7.191431, 6.8593383, 6.4970536, 1)
+
+[node name="PlanoArma" type="Area3D" unique_id=558526395]
+collision_mask = 2
+script = ExtResource("1_5i450")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=544210490]
+transform = Transform3D(1.2, 0, 0, 0, 1.2, 0, 0, 0, 1.2, 0, 0.5, 0)
+shape = SubResource("SphereShape3D_6tqnb")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1855914147]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_5i450")
+surface_material_override/0 = SubResource("StandardMaterial3D_vqbw8")
+
+[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1414169407]
+light_energy = 2.0

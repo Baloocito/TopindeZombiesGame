@@ -31,6 +31,30 @@ text = "opciones"
 layout_mode = 2
 text = "Abandonar"
 
+[node name="PanelOpciones" type="Panel" parent="." unique_id=1485074534]
+offset_left = 199.0
+offset_top = 89.0
+offset_right = 951.0
+offset_bottom = 539.0
+
+[node name="Label" type="Label" parent="PanelOpciones" unique_id=791336759]
+layout_mode = 0
+offset_left = 192.0
+offset_top = 194.0
+offset_right = 566.0
+offset_bottom = 261.0
+theme_override_font_sizes/font_size = 30
+text = "OPCIONES Próximamente"
+
+[node name="Button" type="Button" parent="PanelOpciones" unique_id=759015557]
+layout_mode = 0
+offset_left = 309.0
+offset_top = 267.0
+offset_right = 424.0
+offset_bottom = 320.0
+text = "Cerrar"
+
 [connection signal="pressed" from="VBoxContainer/BotonReanudar" to="." method="_on_boton_reanudar_pressed"]
 [connection signal="pressed" from="VBoxContainer/BotonOpciones" to="." method="_on_boton_opciones_pressed"]
 [connection signal="pressed" from="VBoxContainer/BotonAbandonar" to="." method="_on_boton_abandonar_pressed"]
+[connection signal="pressed" from="PanelOpciones/Button" to="." method="_on_boton_cerrar_opciones_pressed"]

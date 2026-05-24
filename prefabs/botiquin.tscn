@@ -1,13 +1,11 @@
 [gd_scene format=3 uid="uid://ds47qlx1j1ffj"]
 
 [ext_resource type="Script" uid="uid://d2x3h0qt4jqgc" path="res://scripts/botiquin.gd" id="1_fgm5e"]
-
-[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_fgm5e"]
-load_path = "res://.godot/imported/pildora.jpg-f4b4bbeb516326ad9d214f8cd1e249fa.s3tc.ctex"
+[ext_resource type="Texture2D" uid="uid://ccqn733tgjnjt" path="res://assets/pildora.jpg" id="2_1y561"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1y561"]
 albedo_color = Color(1, 0.9764706, 0.95686275, 1)
-albedo_texture = SubResource("CompressedTexture2D_fgm5e")
+albedo_texture = ExtResource("2_1y561")
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_xugua"]
 

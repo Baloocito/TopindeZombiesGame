@@ -1,52 +1,221 @@
 extends Node3D
 
 # ==========================================================
-# 1. ESTADOS DEL JUEGO Y REFERENCIAS PRINCIPALES
+# 1. BASES DE DATOS Y CONSTANTES (Configuración estática)
+# ==========================================================
+const TAMAÑO_GRILLA: float = 2.0
+
+# Mantenemos las bases de datos en memoria.
+# (Tip Pro: A futuro, esto se puede escalar a un Autoload/Singleton global).
+var bd_armas = {
+	"pistola": {"nombre": "Pistola 9mm", "tier": 1, "costo_ensamblaje": 0}, 
+	"escopeta": {"nombre": "Escopeta Vieja", "tier": 1, "costo_ensamblaje": 400},
+	"smg": {"nombre": "SMG Viper", "tier": 2, "costo_ensamblaje": 1200},
+	"rifle_caza": {"nombre": "Rifle de Caza", "tier": 2, "costo_ensamblaje": 1200},
+	"lanzallamas": {"nombre": "Lanzallamas", "tier": 3, "costo_ensamblaje": 2500},
+	"ballesta": {"nombre": "Ballesta Expl.", "tier": 3, "costo_ensamblaje": 2500},
+	"clavos": {"nombre": "Rifle de Clavos", "tier": 3, "costo_ensamblaje": 2500},
+	"minigun": {"nombre": "Minigun", "tier": 4, "costo_ensamblaje": 5000},
+	"riel": {"nombre": "Cañón de Riel", "tier": 4, "costo_ensamblaje": 5000},
+	"lanzagranadas": {"nombre": "Lanzagranadas", "tier": 4, "costo_ensamblaje": 5000}
+}
+var arma_inspeccionada: ArmaData = null
+var datos_estructuras = {
+	"madera": {"nombre": "Valla Madera", "precio": 150, "inflacion": 0.10, "hp": 500},
+	"puas": {"nombre": "Alambre Púas", "precio": 300, "inflacion": 0.15, "hp": 300},
+	"barril": {"nombre": "Barril Explosivo", "precio": 250, "inflacion": 0.0, "hp": 1},
+	"acero": {"nombre": "Barrera Acero", "precio": 600, "inflacion": 0.20, "hp": 2000},
+	"electrico": {"nombre": "Muro Eléctrico", "precio": 1000, "inflacion": 0.25, "hp": 1200},
+	"torreta": {"nombre": "Base Torreta", "precio": 1500, "inflacion": 0.30, "hp": 800}
+}
+
+# ==========================================================
+# 2. ESTADO GLOBAL DEL JUEGO
 # ==========================================================
 var modo_construccion: bool = false
 var fase_combate: bool = false 
 var oleada_actual: int = 1     
 var zombies_vivos: int = 0     
-@onready var menu_pausa = $MenuPausa # Ajusta la ruta si es necesario
-@onready var texto_game_over = $InterfazUI/TextoGameOver
-@onready var boton_reiniciar = $InterfazUI/BotonReiniciar
-@onready var boton_iniciar = $InterfazUI/BotonIniciar 
-@onready var texto_dinero = $InterfazUI/EsquinaDerecha/HBoxContainer/PanelDinero/HBoxContainer/LblDinero
-@onready var boton_construir = $InterfazUI/EsquinaDerecha/HBoxContainer/CajaBotones/BotonConstruir
-@onready var lbl_construir = $InterfazUI/EsquinaDerecha/HBoxContainer/CajaBotones/LblConstruir
-
-@export var caja_municion_escena: PackedScene 
-@export var botiquin_escena: PackedScene 
-@export var moneda_escena: PackedScene
-
-# --- NUEVAS REFERENCIAS UI ---
-@onready var panel_fase = $InterfazUI/ContenedorAlertas/PanelFase
-@onready var lbl_titulo_fase = $InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/LblTituloFase
-@onready var lbl_zombies = $InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/CajaZombies/LblZombies
 var zombies_asesinados_partida: int = 0
-
-func _ready():
-	holograma.visible = false
-	
-	panel_fase.visible = false
-	fase_preparacion()
-
-# ==========================================================
-# 2. SISTEMA DE ECONOMÍA, PROGRESIÓN Y REPARACIÓN
-# ==========================================================
 var dinero_global: int = 10000
 var reparaciones_usadas: int = 0 
 var modificador_suerte: float = 0.0 
 
+var planos_desbloqueados: Array[String] = []
+var tienda_rotacion_actual: Array[String] = []
+var nivel_armas = {
+	"pistola": 1, "escopeta": 1, "smg": 1, "rifle_caza": 1,
+	"lanzallamas": 1, "ballesta": 1, "clavos": 1,
+	"minigun": 1, "riel": 1, "lanzagranadas": 1
+}
 
+# Variables de construcción y colocación magnética
+var objeto_seleccionado_tienda: String = ""
+var torreta_seleccionada: Node3D = null 
+var construcciones_realizadas = { "madera": 0, "puas": 0, "barril": 0, "acero": 0, "electrico": 0, "torreta": 0 }
+var celdas_ocupadas: Dictionary = {}
+var celda_previa_tocada: Vector3 = Vector3.INF
+
+# ==========================================================
+# 3. ENLACES A NODOS (UI y Escenas)
+# ==========================================================
+@export_category("Escenas de Entidades")
+@export var plano_arma_escena: PackedScene
+@export var caja_municion_escena: PackedScene 
+@export var botiquin_escena: PackedScene 
+@export var moneda_escena: PackedScene
+
+@export var escena_madera: PackedScene
+@export var escena_puas: PackedScene
+@export var escena_barril: PackedScene
+@export var escena_acero: PackedScene
+@export var escena_electrico: PackedScene
+@export var escena_torreta: PackedScene
+
+# --- Vistas Generales ---
+@onready var holograma = $Holograma
+@onready var cuadricula_visual = $CuadriculaVisual
+@onready var texto_game_over = $InterfazUI/TextoGameOver
+@onready var boton_reiniciar = $InterfazUI/BotonReiniciar
+@onready var boton_iniciar = $InterfazUI/BotonIniciar 
+@onready var texto_dinero = $InterfazUI/HudSuperiorDerecho/GrupoDinero/PanelDinero/LblDinero
 @onready var boton_reparar = $InterfazUI/BotonReparar 
 
+# --- HUD Gestión (Lateral) ---
+@onready var boton_pausa = $InterfazUI/HudLateralDerecho/BotonPausa
+@onready var boton_construir = $InterfazUI/HudLateralDerecho/BotonConstruir
+@onready var boton_mochila = $InterfazUI/HudLateralDerecho/BotonMochila
+@onready var boton_ensamblar = $InterfazUI/HudLateralDerecho/BotonEnsamblar
+@onready var boton_nivel = $InterfazUI/HudSuperiorIzquierdo/BotonNivel
+
+# --- HUD Combate (Inferior) ---
+@onready var hud_combate = $InterfazUI/EsquinaArmas
+@onready var slot_arma_1 = $InterfazUI/EsquinaArmas/ContenedorArmas/SlotArma1
+@onready var slot_arma_2 = $InterfazUI/EsquinaArmas/ContenedorArmas/SlotArma2
+@onready var slot_arma_3 = $InterfazUI/EsquinaArmas/ContenedorArmas/SlotArma3
+@onready var btn_recarga_izq = $InterfazUI/BotonRecargaIzquierdo
+@onready var btn_recarga_der = $InterfazUI/BotonRecargaDerecho
+
+# --- Paneles y Menús ---
+@onready var panel_fase = $InterfazUI/ContenedorAlertas/PanelFase
+@onready var lbl_titulo_fase = $InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/LblTituloFase
+@onready var lbl_zombies = $InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/CajaZombies/LblZombies
+
+@onready var menu_pausa = $MenuPausa
+@onready var panel_lateral = $InterfazUI/PanelLateral
+@onready var boton_cerrar_panel = $InterfazUI/PanelLateral/BotonCerrar
+@onready var menu_armeria = $InterfazUI/PanelLateral/MargenInterno/ScrollLateral/ContenedorMenus/MenuArmeria
+@onready var menu_construccion = $InterfazUI/PanelLateral/MargenInterno/ScrollLateral/ContenedorMenus/MenuConstruccion
+@onready var menu_inspector = $InterfazUI/PanelLateral/MargenInterno/ScrollLateral/ContenedorMenus/MenuInspector
+@onready var menu_nivel = $InterfazUI/PanelLateral/MargenInterno/ScrollLateral/ContenedorMenus/MenuNivel
+@onready var menu_ensamblaje = $InterfazUI/PanelLateral/MargenInterno/ScrollLateral/ContenedorMenus/MenuEnsamblaje
+
+var tween_fase: Tween 
+
+# ==========================================================
+# 4. INICIALIZACIÓN
+# ==========================================================
+func _ready():
+	holograma.visible = false
+	panel_fase.visible = false
+	sumar_dinero(0)
+	fase_preparacion()
+	
+	conectar_botones_combate()
+
+func conectar_botones_combate():
+	# Lógica modular para la inyección de armas. Evita redundancia.
+	var equipar_lambda = func(slot_id: int):
+		var jugadores = get_tree().get_nodes_in_group("jugador")
+		if not jugadores.is_empty(): jugadores[0].equipar_arma_directa(slot_id)
+		
+	var recargar_lambda = func():
+		var jugadores = get_tree().get_nodes_in_group("jugador")
+		if not jugadores.is_empty() and jugadores[0].has_method("recargar_arma_actual"): 
+			jugadores[0].recargar_arma_actual()
+
+	if slot_arma_1: slot_arma_1.pressed.connect(equipar_lambda.bind(0))
+	if slot_arma_2: slot_arma_2.pressed.connect(equipar_lambda.bind(1))
+	if slot_arma_3: slot_arma_3.pressed.connect(equipar_lambda.bind(2))
+	
+	if btn_recarga_izq: btn_recarga_izq.pressed.connect(recargar_lambda)
+	if btn_recarga_der: btn_recarga_der.pressed.connect(recargar_lambda)
+
+# ==========================================================
+# 5. GESTOR DE FASES (DÍA / NOCHE) Y UI
+# ==========================================================
+func cambiar_fase_ui(es_combate: bool):
+	# Encendido y apagado masivo de la interfaz a través de Arrays de Nodos
+	var ui_dia = [boton_iniciar, boton_construir, boton_mochila, boton_nivel, boton_ensamblar]
+	var ui_noche = [hud_combate, btn_recarga_izq, btn_recarga_der]
+	
+	for elemento in ui_dia:
+		if is_instance_valid(elemento): elemento.visible = not es_combate
+		
+	for elemento in ui_noche:
+		if is_instance_valid(elemento): elemento.visible = es_combate
+
+	# =========================================================
+	# ¡LA SOLUCIÓN DEL DISPARO! Controlamos el seguro del arma
+	# =========================================================
+	var jugadores = get_tree().get_nodes_in_group("jugador")
+	if not jugadores.is_empty() and jugadores[0].has_method("set_can_fire"):
+		jugadores[0].set_can_fire(es_combate)
+
+func fase_preparacion():
+	fase_combate = false
+	modo_construccion = false
+	holograma.visible = false
+	
+	if oleada_actual > 1:
+		var bono_supervivencia = 100 * (oleada_actual - 1)
+		repartir_experiencia_global(bono_supervivencia)
+	
+	animar_fase("DÍA " + str(oleada_actual) + ": PREPÁRATE", Color.WHITE)
+	
+	cambiar_fase_ui(false) # Entramos en modo Gestión
+	
+	reparaciones_usadas = 0 
+	if boton_reparar:
+		boton_reparar.visible = true
+		actualizar_boton_reparacion()
+
+func iniciar_oleada():
+	fase_combate = true
+	modo_construccion = false 
+	holograma.visible = false
+	cerrar_menu_lateral()
+	animar_fase("NOCHE ETERNA: OLEADA " + str(oleada_actual), Color(1, 0.2, 0.2))
+	
+	cambiar_fase_ui(true) # Entramos en modo Combate
+	if boton_reparar: boton_reparar.visible = false
+	
+	zombies_vivos = $GeneradorZombies.preparar_oleada(oleada_actual)
+	$GeneradorZombies.iniciar_generacion()
+
+func animar_fase(titulo: String, color_texto: Color):
+	lbl_titulo_fase.text = titulo
+	lbl_titulo_fase.modulate = color_texto
+	panel_fase.visible = true
+	panel_fase.modulate.a = 0.0 
+	panel_fase.scale = Vector2(1.2, 1.2) 
+	
+	if tween_fase: tween_fase.kill()
+	tween_fase = create_tween()
+	tween_fase.tween_property(panel_fase, "modulate:a", 1.0, 0.4)
+	tween_fase.parallel().tween_property(panel_fase, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_BOUNCE)
+	tween_fase.tween_interval(4.0)
+	tween_fase.tween_property(panel_fase, "modulate:a", 0.0, 0.5)
+	tween_fase.tween_callback(panel_fase.hide)
+
+# ==========================================================
+# 6. SISTEMA DE ECONOMÍA, PROGRESIÓN Y REPARACIÓN
+# ==========================================================
 func sumar_dinero(cantidad: int):
 	dinero_global += cantidad
 	texto_dinero.text = str(dinero_global) + "G"
 	actualizar_boton_reparacion()
 
-# ¡OPTIMIZADO! Función única para no repetir código al dar XP
 func repartir_experiencia_global(cantidad: int):
 	if cantidad <= 0: return
 	var jugadores = get_tree().get_nodes_in_group("jugador")
@@ -57,19 +226,16 @@ func repartir_experiencia_global(cantidad: int):
 func obtener_costo_reparacion() -> int:
 	var costo_total = 0
 	var barricadas = get_tree().get_nodes_in_group("barricadas")
-	
 	for barricada in barricadas:
 		if barricada.has_method("obtener_costo_reparacion"):
-			var precio_mercado = obtener_precio_estructura("madera") # Por defecto
+			var precio_mercado = obtener_precio_estructura("madera") 
 			if "tipo_estructura" in barricada and barricada.tipo_estructura != "":
 				precio_mercado = obtener_precio_estructura(barricada.tipo_estructura)
 			costo_total += barricada.obtener_costo_reparacion(precio_mercado)
-			
 	return costo_total
 	
 func actualizar_boton_reparacion():
 	if not boton_reparar: return
-	
 	var costo = obtener_costo_reparacion()
 	var usos_restantes = 1 - reparaciones_usadas 
 	
@@ -77,93 +243,106 @@ func actualizar_boton_reparacion():
 		boton_reparar.text = "Base Intacta"
 		boton_reparar.disabled = true
 	else:
-		boton_reparar.text = "Reparar Todo ($" + str(costo)
+		boton_reparar.text = "Reparar Todo ($" + str(costo) + ")"
 		boton_reparar.disabled = (dinero_global < costo or usos_restantes <= 0)
 
 func ejecutar_reparacion_global():
 	var costo = obtener_costo_reparacion()
 	if costo == 0 or dinero_global < costo or reparaciones_usadas >= 1: return
-		
 	sumar_dinero(-costo)
 	reparaciones_usadas += 1
-	
 	var barricadas = get_tree().get_nodes_in_group("barricadas")
 	for barricada in barricadas:
 		if barricada.has_method("reparar_completamente"):
 			barricada.reparar_completamente()
-			
 	actualizar_boton_reparacion()
 
+# ==========================================================
+# 7. GENERACIÓN DE LOOT (Director de IA)
+# ==========================================================
 func spawn_loot(pos_muerte: Vector3, tipo_zombie: String):
-	var bounty: int = 0
-	var oro_base: int = 0
-	var prob_oro: float = 0.0
-	var xp_ganada: int = 0 
-	
-	# 1. Ajuste de Estadísticas por Tipo
+	var bounty: int = 0; var oro_base: int = 0; var xp_ganada: int = 0 
 	match tipo_zombie:
-		"basico":
-			bounty = 10; oro_base = 25; prob_oro = 60.0; xp_ganada = 5 # Subimos prob_oro de 40 a 60
-		"corredor":
-			bounty = 15; oro_base = 45; prob_oro = 70.0; xp_ganada = 10
-		"explosivo":
-			bounty = 20; oro_base = 70; prob_oro = 80.0; xp_ganada = 20
-		"tanque":
-			bounty = 50; oro_base = 150; prob_oro = 100.0; xp_ganada = 50
-		"boss":
-			bounty = 500; oro_base = 2000; prob_oro = 100.0; xp_ganada = 1000
+		"basico": bounty = 10; oro_base = 25; xp_ganada = 5
+		"corredor": bounty = 15; oro_base = 45; xp_ganada = 10
+		"explosivo": bounty = 20; oro_base = 70; xp_ganada = 20
+		"tanque": bounty = 50; oro_base = 150; xp_ganada = 50
+		"boss": bounty = 500; oro_base = 2000; xp_ganada = 1000
 		
 	sumar_dinero(bounty)
 	repartir_experiencia_global(xp_ganada)
 			
-	# 2. Lógica de Loot de Ítems (Ajustada)
-	var dado_loot = randf_range(1.0, 100.0) + modificador_suerte
+	var es_elite = (tipo_zombie == "tanque" or tipo_zombie == "boss")
 	var solto_algo: bool = false
+	var dado_loot = randf_range(1.0, 100.0) + modificador_suerte
 	
-	# Rango 61-85: Munición (25% de probabilidad) - PRIORIDAD LIGERA
-	if dado_loot >= 61.0 and dado_loot < 86.0:
+	var umbral_municion = 61.0 
+	var umbral_botiquin = 86.0 
+	var umbral_plano = 96.0    
+	
+	var jugadores = get_tree().get_nodes_in_group("jugador")
+	var jugador = null
+	
+	if not jugadores.is_empty():
+		jugador = jugadores[0]
+		if "salud_actual" in jugador and "stat_salud_maxima" in jugador:
+			if jugador.salud_actual <= (jugador.stat_salud_maxima * 0.3):
+				umbral_botiquin = 60.0 
+				umbral_municion = 96.0 
+		elif jugador.arma_actual:
+			var tipo_balas = jugador.arma_actual.tipo_municion
+			var reserva = jugador.municion_reserva.get(tipo_balas, 0)
+			if reserva <= jugador.arma_actual.tamano_cargador:
+				umbral_municion = 40.0 
+
+	# Reparto de Dropeos físicos
+	if (dado_loot >= umbral_municion and dado_loot < umbral_botiquin) and not es_elite:
 		if caja_municion_escena:
 			var caja = caja_municion_escena.instantiate()
-			get_parent().add_child(caja) # Añadir al padre para que no se mueva con el zombie
+			get_parent().add_child(caja)
 			caja.global_position = pos_muerte + Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
-			
-			# Lógica inteligente para dar más munición ligera si el jugador la usa
-			var jugadores = get_tree().get_nodes_in_group("jugador")
-			if jugadores.size() > 0:
-				var jugador = jugadores[0]
-				if jugador.arma_actual:
-					# Si usa SMG o Minigun, damos 3 cargadores en vez de 2
-					var multiplicador = 3 if jugador.arma_actual.tipo_municion == "ligera" else 2
-					var cantidad = jugador.arma_actual.tamano_cargador * multiplicador
-					if caja.has_method("configurar"): 
-						caja.configurar(jugador.arma_actual.tipo_municion, cantidad)
+			if jugador and jugador.arma_actual:
+				var multiplicador = 3 if jugador.arma_actual.tipo_municion == "ligera" else 2
+				var cantidad = jugador.arma_actual.tamano_cargador * multiplicador
+				if caja.has_method("configurar"): caja.configurar(jugador.arma_actual.tipo_municion, cantidad)
 			solto_algo = true
 			
-	# Rango 86-95: Botiquines (10% de probabilidad)
-	elif dado_loot >= 86.0 and dado_loot < 96.0:
+	elif (dado_loot >= umbral_botiquin and dado_loot < umbral_plano) and not es_elite:
 		if botiquin_escena:
 			var botiquin = botiquin_escena.instantiate()
 			get_parent().add_child(botiquin)
 			botiquin.global_position = pos_muerte + Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
 			solto_algo = true
 			
-	# Rango 96+: Item Especial / Arma (5% de probabilidad)
-	elif dado_loot >= 96.0:
-		# Aquí iría tu lógica de soltar una pieza de arma o item raro
-		solto_algo = true
+	elif dado_loot >= umbral_plano or es_elite:
+		if plano_arma_escena:
+			solto_algo = true
+			var plano = plano_arma_escena.instantiate()
+			get_parent().add_child(plano)
+			plano.global_position = pos_muerte + Vector3(0, 0.5, 0) 
+			
+			var nivel_jugador = 1
+			if jugador: nivel_jugador = jugador.nivel
+			
+			var tier_maximo = 2
+			if nivel_jugador >= 20: tier_maximo = 4
+			elif nivel_jugador >= 10: tier_maximo = 3
+				
+			if plano.has_method("generar_plano"):
+				plano.generar_plano(tier_maximo, es_elite)
 
-	# Sistema de Pity (Suerte)
 	modificador_suerte = 0.0 if solto_algo else modificador_suerte + 0.5
 
-	# 3. Lógica de Oro Físico
-	if randf_range(1.0, 100.0) <= prob_oro:
-		var oro_final = int(oro_base * (1.0 + (0.15 * (oleada_actual - 1))))
-		if moneda_escena:
-			var moneda = moneda_escena.instantiate()
-			get_parent().add_child(moneda)
-			moneda.global_position = pos_muerte + Vector3(randf_range(-0.6, 0.6), 0, randf_range(-0.6, 0.6))
-			moneda.valor_oro = oro_final
-			
+	# Oro garantizado (Dinámico)
+	var variacion_dinero = randf_range(0.8, 1.2)
+	var oro_final = int((oro_base * variacion_dinero) * (1.0 + (0.15 * (oleada_actual - 1))))
+	
+	if moneda_escena and oro_final > 0:
+		var moneda = moneda_escena.instantiate()
+		get_parent().add_child(moneda)
+		moneda.global_position = pos_muerte + Vector3(randf_range(-0.6, 0.6), 0, randf_range(-0.6, 0.6))
+		moneda.valor_oro = oro_final 
+		
 func generar_chatarra(posicion_destruccion: Vector3):
 	if moneda_escena:
 		var chatarra = moneda_escena.instantiate()
@@ -171,78 +350,8 @@ func generar_chatarra(posicion_destruccion: Vector3):
 		chatarra.global_position = posicion_destruccion
 		chatarra.valor_oro = 20
 
-# ==========================================================
-# 3. LÓGICA DE OLEADAS Y ANIMACIONES
-# ==========================================================
-var tween_fase: Tween # ¡NUEVO! Controla la animación para poder interrumpirla si es necesario
-
-func animar_fase(titulo: String, color_texto: Color):
-	lbl_titulo_fase.text = titulo
-	lbl_titulo_fase.modulate = color_texto
-	
-	# Aseguramos que el panel se vea y lo preparamos para la animación
-	panel_fase.visible = true
-	panel_fase.modulate.a = 0.0 # Totalmente transparente al inicio
-	panel_fase.scale = Vector2(1.2, 1.2) # Un poco más grande para el efecto de impacto
-	
-	# Si había una animación anterior corriendo, la detenemos
-	if tween_fase: tween_fase.kill()
-	tween_fase = create_tween()
-	
-	# PASO 1: Aparecer rápidamente (Fade In + Rebote)
-	tween_fase.tween_property(panel_fase, "modulate:a", 1.0, 0.4)
-	tween_fase.parallel().tween_property(panel_fase, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_BOUNCE)
-	
-	# PASO 2: Mantenerse en pantalla por 4 segundos
-	tween_fase.tween_interval(4.0)
-	
-	# PASO 3: Desvanecerse suavemente (Fade Out)
-	tween_fase.tween_property(panel_fase, "modulate:a", 0.0, 0.5)
-	
-	# PASO 4: Apagar el nodo para que no estorbe (ahorra memoria)
-	tween_fase.tween_callback(func(): panel_fase.visible = false)
-	
-func fase_preparacion():
-	fase_combate = false
-	modo_construccion = false
-	holograma.visible = false
-	
-	boton_construir.text = "🔨" 
-	lbl_construir.text = "Construcción"
-	
-	if oleada_actual > 1:
-		var bono_supervivencia = 100 * (oleada_actual - 1)
-		repartir_experiencia_global(bono_supervivencia)
-	
-	animar_fase("DÍA " + str(oleada_actual) + ": PREPÁRATE", Color.WHITE)
-	
-	boton_iniciar.visible = true
-	boton_construir.visible = true
-	reparaciones_usadas = 0 
-	if boton_reparar:
-		boton_reparar.visible = true
-		actualizar_boton_reparacion()
-		
-func iniciar_oleada():
-	fase_combate = true
-	modo_construccion = false 
-	holograma.visible = false
-	cerrar_menu_lateral()
-	
-	# ¡NUEVO! Llamamos a la animación con color ROJO PELIGRO
-	animar_fase("NOCHE ETERNA: OLEADA " + str(oleada_actual), Color(1, 0.2, 0.2))
-	
-	boton_iniciar.visible = false
-	boton_construir.visible = false 
-	if boton_reparar: boton_reparar.visible = false
-	
-	zombies_vivos = $GeneradorZombies.preparar_oleada(oleada_actual)
-	$GeneradorZombies.iniciar_generacion()
-
 func zombie_eliminado():
 	GuardadoGlobal.zombies_totales += 1
-	
-	# ¡NUEVO! Actualizamos el marcador de calaveras
 	zombies_asesinados_partida += 1
 	lbl_zombies.text = str(zombies_asesinados_partida)
 	
@@ -259,44 +368,17 @@ func ejecutar_game_over():
 	
 	texto_game_over.visible = true
 	boton_reiniciar.visible = true
+	
+	cambiar_fase_ui(false) # Escondemos todo para que no estorbe en el Game Over
 	boton_iniciar.visible = false
 	boton_construir.visible = false
-	if boton_reparar: boton_reparar.visible = false
 
 func _on_boton_reiniciar_pressed():
 	get_tree().reload_current_scene()
 
 # ==========================================================
-# 4. SISTEMA DE TIENDA Y CONSTRUCCIÓN
+# 8. SISTEMA DE TIENDA Y CONSTRUCCIÓN TÁCTIL
 # ==========================================================
-var objeto_seleccionado_tienda: String = ""
-var torreta_seleccionada: Node3D = null 
-
-@export var escena_madera: PackedScene
-@export var escena_puas: PackedScene
-@export var escena_barril: PackedScene
-@export var escena_acero: PackedScene
-@export var escena_electrico: PackedScene
-@export var escena_torreta: PackedScene
-
-var datos_estructuras = {
-	"madera": {"nombre": "Valla Madera", "precio": 150, "inflacion": 0.10, "hp": 500},
-	"puas": {"nombre": "Alambre Púas", "precio": 300, "inflacion": 0.15, "hp": 300},
-	"barril": {"nombre": "Barril Explosivo", "precio": 250, "inflacion": 0.0, "hp": 1},
-	"acero": {"nombre": "Barrera Acero", "precio": 600, "inflacion": 0.20, "hp": 2000},
-	"electrico": {"nombre": "Muro Eléctrico", "precio": 1000, "inflacion": 0.25, "hp": 1200},
-	"torreta": {"nombre": "Base Torreta", "precio": 1500, "inflacion": 0.30, "hp": 800}
-}
-
-var construcciones_realizadas = {
-	"madera": 0, "puas": 0, "barril": 0, "acero": 0, "electrico": 0, "torreta": 0
-}
-
-
-@onready var holograma = $Holograma
-const TAMAÑO_GRILLA: float = 2.0 
-var celdas_ocupadas: Dictionary = {}
-
 func obtener_precio_estructura(clave_id: String) -> int:
 	var datos = datos_estructuras[clave_id]
 	var multiplicador_cantidad = 1.0 + (construcciones_realizadas[clave_id] * datos["inflacion"])
@@ -306,23 +388,34 @@ func obtener_precio_estructura(clave_id: String) -> int:
 
 func alternar_modo_construccion():
 	if fase_combate: return 
-		
 	if modo_construccion:
 		modo_construccion = false 
-		lbl_construir.text = "Tienda\nConstrucción" # <--- Cambiamos el Label de abajo
-		boton_construir.modulate = Color.WHITE # Vuelve a su color normal
+		boton_construir.modulate = Color.WHITE
 		holograma.visible = false
+		animar_cuadricula(false)
 	else:
-		abrir_menu_construccion()
+		abrir_menu_interactivo(menu_construccion, actualizar_lista_construccion)
 
-func iniciar_colocacion_objeto(tipo_objeto: String):
+func iniciar_colocacion_objeto(clave: String):
 	modo_construccion = true
-	objeto_seleccionado_tienda = tipo_objeto 
+	objeto_seleccionado_tienda = clave
 	
-	lbl_construir.text = "Cancelar\nConstrucción" # <--- Cambiamos el Label de abajo
-	boton_construir.modulate = Color(1, 0.5, 0.5) # Lo teñimos de rojo para indicar que cancela
-	
-	holograma.visible = true
+	boton_construir.modulate = Color(1, 0.5, 0.5) 
+	holograma.visible = false 
+	celda_previa_tocada = Vector3.INF 
+	animar_cuadricula(true)
+
+func animar_cuadricula(mostrar: bool):
+	if not cuadricula_visual: return
+	if mostrar:
+		cuadricula_visual.visible = true
+		cuadricula_visual.position.y = -2.0 
+		var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(cuadricula_visual, "position:y", 0.1, 0.5) 
+	else:
+		var tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tween.tween_property(cuadricula_visual, "position:y", -2.0, 0.4)
+		tween.tween_callback(cuadricula_visual.hide) 
 
 func construir_estructura():
 	if objeto_seleccionado_tienda == "": return
@@ -355,154 +448,175 @@ func construir_estructura():
 	nuevo_edificio.global_position = holograma.global_position
 	celdas_ocupadas[pos_llave] = true
 	
-	actualizar_boton_reparacion()
-	# Si decides dejar el modo construcción continuo, no toques el lbl_construir aquí.
-	# =========================================================
-	# ¡NUEVO! APLICAMOS LA STAT DE INGENIERÍA
-	# =========================================================
 	var hp_oficial = datos_estructuras[objeto_seleccionado_tienda]["hp"]
 	var multiplicador_ingenieria = 1.0
-	
 	var jugadores = get_tree().get_nodes_in_group("jugador")
 	if not jugadores.is_empty() and "stat_ingenieria" in jugadores[0]:
 		multiplicador_ingenieria = jugadores[0].stat_ingenieria
 		
 	var hp_final = int(hp_oficial * multiplicador_ingenieria)
-	
 	if "salud_maxima" in nuevo_edificio:
 		nuevo_edificio.salud_maxima = hp_final
 		nuevo_edificio.salud_actual = hp_final
 	
 	actualizar_boton_reparacion()
 	
-
-
-func _process(_delta):
-	if not modo_construccion or fase_combate: return
-		
-	var camara = get_viewport().get_camera_3d()
-	if not camara: return
-		
-	var pos_pantalla = get_viewport().get_mouse_position()
-	var origen_rayo = camara.project_ray_origin(pos_pantalla)
-	var direccion_rayo = camara.project_ray_normal(pos_pantalla)
-	var punto_interseccion = Plane(Vector3.UP, 0).intersects_ray(origen_rayo, direccion_rayo)
-	
-	if punto_interseccion != null:
-		holograma.global_position = Vector3(snapped(punto_interseccion.x, TAMAÑO_GRILLA), 1.0, snapped(punto_interseccion.z, TAMAÑO_GRILLA))
-		
-		# ¡OPTIMIZADO! Evitamos calcular el precio si no hemos elegido nada en la tienda
-		if objeto_seleccionado_tienda != "" and datos_estructuras.has(objeto_seleccionado_tienda):
-			var costo_actual = obtener_precio_estructura(objeto_seleccionado_tienda) 
-			holograma.material_override.albedo_color = Color(0, 1, 0, 0.5) if dinero_global >= costo_actual else Color(1, 0, 0, 0.5)
+	celda_previa_tocada = Vector3.INF 
+	var costo_siguiente = obtener_precio_estructura(objeto_seleccionado_tienda)
+	holograma.material_override.albedo_color = Color(0, 1, 0, 0.6) if dinero_global >= costo_siguiente else Color(1, 0, 0, 0.6)
 
 func _unhandled_input(event):
 	if not modo_construccion or fase_combate: return
 		
-	if (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed) or (event is InputEventScreenTouch and event.pressed):
-		construir_estructura()
-
+	if event is InputEventScreenTouch and event.pressed:
+		var camara = get_viewport().get_camera_3d()
+		if not camara: return
+			
+		var origen_rayo = camara.project_ray_origin(event.position)
+		var direccion_rayo = camara.project_ray_normal(event.position)
+		var punto_interseccion = Plane(Vector3.UP, 0).intersects_ray(origen_rayo, direccion_rayo)
+		
+		if punto_interseccion != null:
+			var celda_tocada = Vector3(snapped(punto_interseccion.x, TAMAÑO_GRILLA), 0.0, snapped(punto_interseccion.z, TAMAÑO_GRILLA))
+			
+			if holograma.visible and celda_tocada == celda_previa_tocada:
+				construir_estructura()
+			else:
+				holograma.global_position = celda_tocada
+				holograma.visible = true
+				celda_previa_tocada = celda_tocada
+				
+				if objeto_seleccionado_tienda != "" and datos_estructuras.has(objeto_seleccionado_tienda):
+					var costo_actual = obtener_precio_estructura(objeto_seleccionado_tienda) 
+					holograma.material_override.albedo_color = Color(0, 1, 0, 0.6) if dinero_global >= costo_actual else Color(1, 0, 0, 0.6)
 
 # ==========================================================
-# 5. MENÚS LATERALES (ARMERÍA, TIENDA E INSPECTOR)
+# 9. SISTEMA DE MENÚS (Dinámico y Escalable)
 # ==========================================================
-# El panel principal y el botón de cerrar siguen en la misma ruta
-@onready var panel_lateral = $InterfazUI/PanelLateral
-@onready var boton_cerrar_panel = $InterfazUI/PanelLateral/BotonCerrar
-
-# ¡AQUÍ ESTÁ LA NUEVA RUTA LARGA! (Atravesando el Margen, el Scroll y el VBoxContainer)
-@onready var menu_armeria = $InterfazUI/PanelLateral/MargenInterno/ScrollLateral/ContenedorMenus/MenuArmeria
-@onready var menu_construccion = $InterfazUI/PanelLateral/MargenInterno/ScrollLateral/ContenedorMenus/MenuConstruccion
-@onready var menu_inspector = $InterfazUI/PanelLateral/MargenInterno/ScrollLateral/ContenedorMenus/MenuInspector
-@onready var menu_nivel = $InterfazUI/PanelLateral/MargenInterno/ScrollLateral/ContenedorMenus/MenuNivel
-
-func _on_boton_cambiar_arma_pressed() -> void:
-	var jugadores = get_tree().get_nodes_in_group("jugador")
-	if not jugadores.is_empty(): jugadores[0].ciclo_arma_rapido()
 
 func _on_boton_cerrar_pressed() -> void: cerrar_menu_lateral()
-func _on_boton_mochila_pressed() -> void: abrir_armeria()
+func _on_boton_mochila_pressed() -> void: abrir_menu_interactivo(menu_armeria, actualizar_lista_armeria)
+func _on_boton_construir_pressed(): alternar_modo_construccion()
+func _on_boton_nivel_pressed() -> void: abrir_menu_interactivo(menu_nivel, actualizar_lista_nivel)
+func _on_boton_ensamblar_pressed() -> void: abrir_menu_interactivo(menu_ensamblaje, actualizar_lista_ensamblaje)
+func _on_boton_pausa_pressed() -> void: if menu_pausa: menu_pausa.alternar_pausa()
 
 func cerrar_menu_lateral():
 	if panel_lateral: panel_lateral.visible = false
 
-func abrir_armeria():
+# ¡NUEVO! Cerebro dinámico que reemplaza 5 funciones repetitivas.
+func abrir_menu_interactivo(menu_activo: Control, funcion_generadora: Callable):
 	if fase_combate: return
-	panel_lateral.visible = true
-	menu_armeria.visible = true
-	menu_construccion.visible = false
-	menu_inspector.visible = false
-	menu_nivel.visible = false
-	actualizar_lista_armeria()
 	
+	panel_lateral.visible = true
+	var todos_los_menus = [menu_armeria, menu_construccion, menu_inspector, menu_nivel, menu_ensamblaje]
+	
+	# Apaga todos los menús excepto el que pediste abrir
+	for menu in todos_los_menus:
+		if is_instance_valid(menu):
+			menu.visible = (menu == menu_activo)
+			
+	# Llama a la función específica (ej. actualizar_lista_armeria)
+	funcion_generadora.call()
+
+func abrir_menu_inspector(torreta_tocada: Node3D):
+	torreta_seleccionada = torreta_tocada
+	abrir_menu_interactivo(menu_inspector, actualizar_lista_inspector)
+
+# ==========================================================
+# 10. GENERADORES DE INTERFAZ DE MENÚS
+# ==========================================================
 func actualizar_lista_armeria():
 	for hijo in menu_armeria.get_children(): hijo.queue_free()
-		
 	var jugadores = get_tree().get_nodes_in_group("jugador")
 	if jugadores.is_empty(): return
 	var jugador = jugadores[0]
 	
-	# --- 1. TÍTULO PROFESIONAL ---
 	var titulo = Label.new()
-	titulo.text = "ARMARIO"
+	titulo.text = "ARMARIO TÁCTICO"
 	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	titulo.add_theme_font_size_override("font_size", 24) # Letra más grande
-	titulo.add_theme_color_override("font_color", Color(1, 0.8, 0.2)) # Color Amarillo/Oro
+	titulo.add_theme_font_size_override("font_size", 24)
+	titulo.add_theme_color_override("font_color", Color(1, 0.8, 0.2))
 	menu_armeria.add_child(titulo)
 	
-	# --- 2. LÍNEA SEPARADORA ---
 	var separador = HSeparator.new()
-	separador.add_theme_constant_override("separation", 15) # Espacio extra
+	separador.add_theme_constant_override("separation", 15)
 	menu_armeria.add_child(separador)
 	
-	# --- 3. LISTA DE ARMAS ---
 	for arma in jugador.armas_inventario:
 		var fila = HBoxContainer.new() 
 		
-		var lbl_nombre = Label.new()
-		lbl_nombre.text = "  " + arma.nombre # Un pequeño espacio al inicio para que no se pegue al borde
-		lbl_nombre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		lbl_nombre.add_theme_font_size_override("font_size", 18) # Tamaño legible
-		fila.add_child(lbl_nombre)
+		# Convertimos el nombre en un botón interactivo
+		var btn_nombre = Button.new()
+		var prefijo = "▼ " if arma_inspeccionada == arma else "▶ "
+		btn_nombre.text = prefijo + arma.nombre 
+		btn_nombre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn_nombre.add_theme_font_size_override("font_size", 18)
 		
-		# Contenedor para los botones de slot para que queden agrupados
+		# Lógica para abrir/cerrar el visor de estadísticas
+		btn_nombre.pressed.connect(func():
+			arma_inspeccionada = null if arma_inspeccionada == arma else arma
+			actualizar_lista_armeria()
+		)
+		fila.add_child(btn_nombre)
+		
 		var caja_slots = HBoxContainer.new()
-		
 		for i in range(3):
 			var btn_slot = Button.new()
 			btn_slot.text = str(i + 1) 
-			btn_slot.custom_minimum_size = Vector2(45, 45) # Botones cuadrados perfectos para celular
-			
-			# Destacar el slot si ya tiene ESTA arma equipada
+			btn_slot.custom_minimum_size = Vector2(45, 45)
 			if jugador.armas_equipadas[i] == arma:
-				btn_slot.modulate = Color(0.2, 1, 0.2) # Verde brillante
+				btn_slot.modulate = Color(0.2, 1, 0.2)
 			
 			btn_slot.pressed.connect(func():
 				jugador.equipar_en_slot(arma, i)
 				if jugador.slot_actual == i: jugador.cambiar_arma(i)
-				actualizar_lista_armeria() # Recargamos para ver el color verde actualizarse
+				actualizar_lista_armeria()
 			)
 			caja_slots.add_child(btn_slot)
 			
 		fila.add_child(caja_slots)
 		menu_armeria.add_child(fila)
 		
-		# Pequeño espacio entre cada fila de armas
+		# =========================================================
+		# EL VISOR DE ESTADÍSTICAS DESPLEGABLE
+		# =========================================================
+		if arma_inspeccionada == arma:
+			var panel_stats = PanelContainer.new()
+			var vbox_stats = VBoxContainer.new()
+			panel_stats.add_child(vbox_stats)
+			
+			# Espacio preparado para el arte Low Poly con borde negro grueso
+			var rect_img = ColorRect.new()
+			rect_img.custom_minimum_size = Vector2(0, 80)
+			rect_img.color = Color(0.15, 0.15, 0.15) # Fondo oscuro
+			
+			var lbl_img = Label.new()
+			lbl_img.text = "[ ESPACIO PARA ICONO TOON ]"
+			lbl_img.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl_img.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			
+			# ¡AQUÍ ESTABA EL ERROR! (Faltaba "Control.")
+			lbl_img.set_anchors_preset(Control.PRESET_FULL_RECT) 
+			
+			rect_img.add_child(lbl_img)
+			vbox_stats.add_child(rect_img)
+			
+			# Datos RPG en tiempo real
+			var lbl_datos = Label.new()
+			lbl_datos.text = "Daño: %d\nCadencia: %.1f bps\nCargador: %d balas\nRecarga: %.2f s" % [arma.dano, arma.cadencia, arma.tamano_cargador, arma.tiempo_recarga]
+			lbl_datos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl_datos.modulate = Color(0.7, 1.0, 1.0)
+			vbox_stats.add_child(lbl_datos)
+			
+			menu_armeria.add_child(panel_stats)
+
 		var espacio = Control.new()
 		espacio.custom_minimum_size = Vector2(0, 10)
 		menu_armeria.add_child(espacio)
 
-func abrir_menu_construccion():
-	panel_lateral.visible = true
-	menu_armeria.visible = false
-	menu_construccion.visible = true 
-	menu_inspector.visible = false
-	menu_nivel.visible = false
-	actualizar_lista_construccion()
-	
 func actualizar_lista_construccion():
 	for hijo in menu_construccion.get_children(): hijo.queue_free()
-		
 	var titulo = Label.new()
 	titulo.text = "--- INGENIERÍA ---"
 	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -518,10 +632,8 @@ func actualizar_lista_construccion():
 		var datos = datos_estructuras[clave]
 		var costo_actual = obtener_precio_estructura(clave)
 		var btn = Button.new()
-		
 		btn.text = datos["nombre"] + " ($" + str(costo_actual) + ") | HP: " + str(datos["hp"])
 		btn.custom_minimum_size = Vector2(0, 60) 
-		# ¡LA MAGIA! Obligamos al botón a estirarse a todo lo ancho
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		
 		if dinero_global < costo_actual:
@@ -534,21 +646,8 @@ func actualizar_lista_construccion():
 		)
 		menu_construccion.add_child(btn)
 
-func abrir_menu_inspector(torreta_tocada: Node3D):
-	if fase_combate: return
-	torreta_seleccionada = torreta_tocada
-	panel_lateral.visible = true
-	menu_armeria.visible = false
-	menu_construccion.visible = false
-	menu_inspector.visible = true 
-	menu_nivel.visible = false
-	actualizar_lista_inspector()
-
 func actualizar_lista_inspector():
-	# 1. LIMPIEZA Y VALIDACIÓN
-	for hijo in menu_inspector.get_children(): 
-		hijo.queue_free()
-		
+	for hijo in menu_inspector.get_children(): hijo.queue_free()
 	if not is_instance_valid(torreta_seleccionada):
 		cerrar_menu_lateral()
 		return
@@ -557,31 +656,36 @@ func actualizar_lista_inspector():
 	if jugadores.is_empty(): return
 	var jugador = jugadores[0]
 	
-	# 2. ENCABEZADO Y ESTADO GENERAL
 	var titulo = Label.new()
-	titulo.text = "--- CENTINELA ---"
+	titulo.text = "CENTINELA"
 	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	titulo.add_theme_font_size_override("font_size", 24)
+	titulo.add_theme_color_override("font_color", Color(1, 0.8, 0.2))
 	menu_inspector.add_child(titulo)
+	
+	var separador = HSeparator.new()
+	separador.add_theme_constant_override("separation", 15)
+	menu_inspector.add_child(separador)
 	
 	var lbl_estado = Label.new()
 	var nombre_arma = torreta_seleccionada.arma_equipada.nombre if torreta_seleccionada.arma_equipada else "Ninguna"
 	lbl_estado.text = "Salud: %s\nArma: %s\nBalas: %s" % [torreta_seleccionada.salud_actual, nombre_arma, torreta_seleccionada.balas_cargadas]
+	lbl_estado.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	menu_inspector.add_child(lbl_estado)
 	
-	# ==========================================
-	# 3. SECCIÓN DE MUNICIÓN
-	# ==========================================
+	var separador2 = HSeparator.new()
+	separador2.add_theme_constant_override("separation", 15)
+	menu_inspector.add_child(separador2)
+	
 	if torreta_seleccionada.arma_equipada != null:
 		var tipo_municion = torreta_seleccionada.arma_equipada.tipo_municion
 		var reserva_jugador = jugador.municion_reserva.get(tipo_municion, 0)
-		
 		var btn_recargar = Button.new()
 		btn_recargar.text = "Dar 30 Balas %s\n(Tu reserva: %s)" % [tipo_municion, reserva_jugador]
 		btn_recargar.custom_minimum_size = Vector2(0, 50)
+		btn_recargar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		
-		# Bloqueamos el botón si no te alcanzan las balas
-		if reserva_jugador < 30: 
-			btn_recargar.disabled = true
+		if reserva_jugador < 30: btn_recargar.disabled = true
 			
 		btn_recargar.pressed.connect(func():
 			jugador.municion_reserva[tipo_municion] -= 30
@@ -591,43 +695,34 @@ func actualizar_lista_inspector():
 		)
 		menu_inspector.add_child(btn_recargar)
 	else:
-		# Si no hay arma, mostramos un aviso en gris
 		var lbl_aviso = Label.new()
 		lbl_aviso.text = "\n[Instala un arma para cargar balas]"
 		lbl_aviso.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl_aviso.modulate = Color(0.7, 0.7, 0.7) 
 		menu_inspector.add_child(lbl_aviso)
 	
-	# ==========================================
-	# 4. SECCIÓN DE INSTALAR/DESINSTALAR ARMAS
-	# ==========================================
 	var subtitulo_armas = Label.new()
 	subtitulo_armas.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	menu_inspector.add_child(subtitulo_armas)
-	
 	if torreta_seleccionada.arma_equipada == null:
 		subtitulo_armas.text = "\n-- INSTALAR ARMA --"
 		for arma in jugador.armas_inventario:
 			var btn_arma = Button.new()
 			btn_arma.text = "Instalar " + arma.nombre
 			btn_arma.custom_minimum_size = Vector2(0, 40)
+			btn_arma.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			
 			btn_arma.pressed.connect(func():
-				# A. Le damos el arma a la torreta y la borramos del inventario
-				torreta_seleccionada.arma_equipada = arma
-				jugador.armas_inventario.erase(arma)
-				
-				# B. Buscamos si estaba equipada en la barra rápida y la sacamos
-				for i in range(3):
-					if jugador.armas_equipadas[i] == arma:
-						jugador.armas_equipadas[i] = null
-						
-						# C. ¡EL EXORCISMO! Si la tenía en la mano físicamente
-						if jugador.slot_actual == i:
-							jugador.arma_actual = null 
-							jugador.actualizar_ui_municion() 
-							jugador.ciclo_arma_rapido() 
-							
+				torreta_seleccionada.arma_equipada = arma.duplicate()
+				if arma.nombre != "Pistola 9mm":
+					jugador.armas_inventario.erase(arma)
+					for i in range(3):
+						if jugador.armas_equipadas[i] == arma:
+							jugador.armas_equipadas[i] = null
+							if jugador.slot_actual == i:
+								jugador.arma_actual = null 
+								jugador.actualizar_ui_municion() 
+								jugador.ciclo_arma_rapido() 
 				actualizar_lista_inspector()
 			)
 			menu_inspector.add_child(btn_arma)
@@ -636,54 +731,46 @@ func actualizar_lista_inspector():
 		var btn_recuperar = Button.new()
 		btn_recuperar.text = "Desinstalar " + torreta_seleccionada.arma_equipada.nombre
 		btn_recuperar.custom_minimum_size = Vector2(0, 40)
+		btn_recuperar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		
 		btn_recuperar.pressed.connect(func():
-			# A. Recuperamos las balas sobrantes primero
 			if torreta_seleccionada.balas_cargadas > 0:
 				var tipo_bala = torreta_seleccionada.arma_equipada.tipo_municion
 				jugador.municion_reserva[tipo_bala] += torreta_seleccionada.balas_cargadas
 				torreta_seleccionada.balas_cargadas = 0
 				jugador.actualizar_ui_municion()
 			
-			# B. Devolvemos el arma al inventario del jugador
-			jugador.armas_inventario.append(torreta_seleccionada.arma_equipada)
+			if torreta_seleccionada.arma_equipada.nombre != "Pistola 9mm":
+				jugador.armas_inventario.append(torreta_seleccionada.arma_equipada)
+				
 			torreta_seleccionada.arma_equipada = null
-			
 			actualizar_lista_inspector()
 		)
 		menu_inspector.add_child(btn_recuperar)
-# --- CARA D: MENÚ DE NIVEL Y ATRIBUTOS ---
-func abrir_menu_nivel():
-	panel_lateral.visible = true
-	menu_armeria.visible = false
-	menu_construccion.visible = false
-	menu_inspector.visible = false
-	menu_nivel.visible = true # ¡Encendemos el menú de RPG!
-	
-	actualizar_lista_nivel()
 
 func actualizar_lista_nivel():
-	for hijo in menu_nivel.get_children(): 
-		hijo.queue_free()
-		
+	for hijo in menu_nivel.get_children(): hijo.queue_free()
 	var jugadores = get_tree().get_nodes_in_group("jugador")
 	if jugadores.is_empty(): return
 	var jugador = jugadores[0]
 	
-	# 1. Título y Puntos Disponibles
 	var titulo = Label.new()
-	titulo.text = "--- ATRIBUTOS (Nivel " + str(jugador.nivel) + ") ---"
+	titulo.text = "ATRIBUTOS"
 	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	titulo.add_theme_font_size_override("font_size", 24)
+	titulo.add_theme_color_override("font_color", Color(1, 0.8, 0.2))
 	menu_nivel.add_child(titulo)
 	
 	var lbl_puntos = Label.new()
-	lbl_puntos.text = "Puntos para gastar: " + str(jugador.puntos_mejora)
+	lbl_puntos.text = "Puntos Disponibles: " + str(jugador.puntos_mejora)
 	lbl_puntos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	if jugador.puntos_mejora > 0:
-		lbl_puntos.modulate = Color(1, 1, 0) # Lo pintamos de amarillo brillante si hay puntos
+	if jugador.puntos_mejora > 0: lbl_puntos.modulate = Color(1, 1, 0) 
 	menu_nivel.add_child(lbl_puntos)
 	
-	# 2. Diccionario de Estadísticas Actuales
+	var separador = HSeparator.new()
+	separador.add_theme_constant_override("separation", 15)
+	menu_nivel.add_child(separador)
+	
 	var stats_ui = [
 		{"id": "salud", "nombre": "Salud Máxima", "valor": str(jugador.stat_salud_maxima) + " HP"},
 		{"id": "agilidad", "nombre": "Agilidad", "valor": str(jugador.stat_agilidad).pad_decimals(1) + " m/s"},
@@ -692,41 +779,162 @@ func actualizar_lista_nivel():
 		{"id": "recoleccion", "nombre": "Imán de Oro", "valor": str(jugador.stat_recoleccion).pad_decimals(1) + " m"}
 	]
 	
-	# 3. Dibujamos cada fila (Texto a la izquierda, Botón '+' a la derecha)
 	for stat in stats_ui:
 		var fila = HBoxContainer.new()
-		
+		fila.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var lbl_stat = Label.new()
-		lbl_stat.text = stat["nombre"] + "\nActual: " + stat["valor"]
+		lbl_stat.text = stat["nombre"] + "\n" + stat["valor"]
 		lbl_stat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		fila.add_child(lbl_stat)
 		
 		var btn_mejorar = Button.new()
 		btn_mejorar.text = " + "
-		btn_mejorar.custom_minimum_size = Vector2(50, 50) # Botón cuadrado y táctil
-		
-		# Si no hay puntos, el botón se bloquea
-		if jugador.puntos_mejora <= 0:
-			btn_mejorar.disabled = true
+		btn_mejorar.custom_minimum_size = Vector2(50, 50) 
+		if jugador.puntos_mejora <= 0: btn_mejorar.disabled = true
 			
-		# Al presionar el +, llamamos a la función RPG del jugador
 		btn_mejorar.pressed.connect(func():
 			jugador.mejorar_estadistica(stat["id"])
-			actualizar_lista_nivel() # Recargamos el menú para ver el cambio en vivo
+			actualizar_lista_nivel() 
 		)
-		
 		fila.add_child(btn_mejorar)
 		menu_nivel.add_child(fila)
+		var espacio = Control.new()
+		espacio.custom_minimum_size = Vector2(0, 5)
+		menu_nivel.add_child(espacio)
 
-
-func _on_boton_nivel_pressed() -> void:
-	abrir_menu_nivel() # ¡Reemplazamos el 'pass' por esto!
-
-
-func _on_boton_pausa_pressed() -> void:
-	if menu_pausa:
-		menu_pausa.alternar_pausa()
-		
-func _on_boton_construir_pressed():
+func actualizar_lista_ensamblaje():
+	for hijo in menu_ensamblaje.get_children(): hijo.queue_free()
 	
-	alternar_modo_construccion()
+	var jugadores = get_tree().get_nodes_in_group("jugador")
+	if jugadores.is_empty(): return
+	var jugador = jugadores[0]
+	
+	var titulo = Label.new()
+	titulo.text = "MESA DE TRABAJO"
+	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	titulo.add_theme_font_size_override("font_size", 24)
+	titulo.add_theme_color_override("font_color", Color(1, 0.8, 0.2))
+	menu_ensamblaje.add_child(titulo)
+	
+	var separador = HSeparator.new()
+	separador.add_theme_constant_override("separation", 15)
+	menu_ensamblaje.add_child(separador)
+	
+	if planos_desbloqueados.is_empty():
+		var lbl_vacio = Label.new()
+		lbl_vacio.text = "No tienes planos.\n¡Explora y caza Jefes!"
+		lbl_vacio.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl_vacio.modulate = Color(0.7, 0.7, 0.7)
+		menu_ensamblaje.add_child(lbl_vacio)
+		return
+		
+	var conteo_planos = {}
+	for p in planos_desbloqueados:
+		conteo_planos[p] = conteo_planos.get(p, 0) + 1
+		
+	for clave in conteo_planos.keys():
+		var cantidad = conteo_planos[clave]
+		var datos = bd_armas[clave]
+		var lvl_actual = nivel_armas[clave]
+		var costo_ensamblar = datos["costo_ensamblaje"]
+		var costo_mejorar = int(costo_ensamblar * 0.6) 
+		
+		# =========================================================
+		# 1. ESCÁNER DE INVENTARIO (¿Ya tenemos esta arma?)
+		# =========================================================
+		var arma_poseida: ArmaData = null
+		for arma in jugador.armas_inventario:
+			if arma.nombre == datos["nombre"]:
+				arma_poseida = arma
+				break
+				
+		# =========================================================
+		# 2. VISOR DE ESTADÍSTICAS RPG
+		# =========================================================
+		var lbl_info = Label.new()
+		var texto_info = "► " + datos["nombre"] + " (x" + str(cantidad) + " Planos)\n"
+		
+		# Si la tenemos, mostramos su daño real. Si no, mostramos nivel 0.
+		if arma_poseida:
+			texto_info += "Nivel: " + str(lvl_actual) + " | Daño: " + str(arma_poseida.dano)
+		else:
+			texto_info += "Estado: No Ensamblada"
+			
+		lbl_info.text = texto_info
+		menu_ensamblaje.add_child(lbl_info)
+		
+		var fila_botones = HBoxContainer.new()
+		fila_botones.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		
+		# =========================================================
+		# 3. LÓGICA CONDICIONAL DE BOTONES
+		# =========================================================
+		if not arma_poseida:
+			# --- SOLO MOSTRAR BOTÓN CREAR ---
+			var btn_crear = Button.new()
+			btn_crear.text = "Ensamblar\n$" + str(costo_ensamblar)
+			btn_crear.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			btn_crear.custom_minimum_size = Vector2(0, 50)
+			btn_crear.modulate = Color(0.5, 1.0, 0.5) # Verde para objetos nuevos
+			if dinero_global < costo_ensamblar: btn_crear.disabled = true
+				
+			btn_crear.pressed.connect(func():
+				sumar_dinero(-costo_ensamblar)
+				var ruta_arma = "res://materials/" + clave + ".tres"
+				var nueva_arma = load(ruta_arma)
+				if nueva_arma:
+					var arma_clonada = nueva_arma.duplicate()
+					jugador.armas_inventario.append(arma_clonada)
+					planos_desbloqueados.erase(clave) 
+					actualizar_lista_ensamblaje()
+			)
+			fila_botones.add_child(btn_crear)
+			
+		else:
+			# --- SOLO MOSTRAR BOTÓN MEJORAR (CON RULETA RNG) ---
+			var btn_mejorar = Button.new()
+			btn_mejorar.text = "Forjar Mejora Aleatoria\n$" + str(costo_mejorar)
+			btn_mejorar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			btn_mejorar.custom_minimum_size = Vector2(0, 50)
+			btn_mejorar.modulate = Color(0.4, 0.8, 1.0) 
+			if dinero_global < costo_mejorar: btn_mejorar.disabled = true
+				
+			btn_mejorar.pressed.connect(func():
+				sumar_dinero(-costo_mejorar)
+				nivel_armas[clave] += 1 
+				planos_desbloqueados.erase(clave) 
+				
+				# 1. Tiramos los dados para elegir qué estadística mejora
+				var stats_posibles = ["dano", "cadencia", "tamano_cargador", "tiempo_recarga"]
+				var stat_elegida = stats_posibles.pick_random()
+				
+				# 2. Multiplicador de mejora basado en el Tier del arma (0.1 a 1.0)
+				# Un arma de Tier 4 puede recibir mejoras mucho más grandes que una de Tier 1.
+				var bono_rng = randf_range(0.1, 0.4) + (datos["tier"] * 0.1)
+				
+				# 3. Aplicamos la mejora específica a la estadística ganadora
+				match stat_elegida:
+					"dano":
+						arma_poseida.dano += max(1, int(arma_poseida.dano * bono_rng))
+						print("Mejora RNG: DAÑO de ", arma_poseida.nombre, " subió a ", arma_poseida.dano)
+					"cadencia":
+						arma_poseida.cadencia += (arma_poseida.cadencia * bono_rng)
+						print("Mejora RNG: CADENCIA de ", arma_poseida.nombre, " subió a ", arma_poseida.cadencia)
+					"tamano_cargador":
+						arma_poseida.tamano_cargador += max(1, int(arma_poseida.tamano_cargador * bono_rng))
+						print("Mejora RNG: CARGADOR de ", arma_poseida.nombre, " subió a ", arma_poseida.tamano_cargador)
+					"tiempo_recarga":
+						# La recarga mejora reduciendo el tiempo (nunca debe llegar a 0)
+						arma_poseida.tiempo_recarga = max(0.1, arma_poseida.tiempo_recarga - (arma_poseida.tiempo_recarga * (bono_rng * 0.5)))
+						print("Mejora RNG: RECARGA de ", arma_poseida.nombre, " bajó a ", arma_poseida.tiempo_recarga)
+				
+				jugador.actualizar_ui_municion() 
+				actualizar_lista_ensamblaje()
+			)
+			fila_botones.add_child(btn_mejorar)
+			
+		menu_ensamblaje.add_child(fila_botones)
+		
+		var espacio = Control.new()
+		espacio.custom_minimum_size = Vector2(0, 15)
+		menu_ensamblaje.add_child(espacio)

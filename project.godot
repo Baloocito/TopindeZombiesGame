@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="TopindeZombiesGame"
+run/main_scene="uid://c7q2ta6xhvchg"
 config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
 
@@ -20,7 +21,9 @@ GuardadoGlobal="*uid://cx72602j8u0yg"
 
 [display]
 
+window/size/mode=3
 window/stretch/mode="canvas_items"
+window/handheld/orientation=4
 
 [global]
 
@@ -98,3 +101,4 @@ pointing/emulate_touch_from_mouse=true
 
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

@@ -1,17 +1,43 @@
 extends StaticBody3D
 
-# Identificador para la tienda y las reparaciones
+# ==========================================================
+# 1. ATRIBUTOS Y ESTADO
+# ==========================================================
+@export_category("Propiedades de la Estructura")
 var tipo_estructura: String = ""
-@export var salud_maxima: int = 5 
+@export var salud_maxima: int = 500 # Default de seguridad (se sobrescribe en mundo.gd)
 var salud_actual: int
 
-func _ready():
-	# Ya no calculamos la llave aquí, solo iniciamos la vida
-	salud_actual = salud_maxima
+var tween_dano: Tween # Controlador de animaciones elásticas
 
+# ==========================================================
+# 2. INICIALIZACIÓN
+# ==========================================================
+func _ready():
+	salud_actual = salud_maxima
+	
+	# ¡BLINDAJE!: Aseguramos por código que pertenezca al grupo "barricadas"
+	# para que los zombies y el sistema de reparación global la encuentren siempre.
+	if not is_in_group("barricadas"):
+		add_to_group("barricadas")
+
+# ==========================================================
+# 3. SISTEMA DE DAÑO Y DESTRUCCIÓN
+# ==========================================================
 func recibir_dano(cantidad: int):
 	salud_actual -= cantidad
-	scale = scale * 0.9 
+	
+	# Efecto visual "Juicy": Animación de rebote al recibir un golpe
+	if tween_dano: tween_dano.kill()
+	tween_dano = create_tween()
+	
+	# Calculamos el tamaño basado en la vida restante (nunca menor al 40% de su tamaño original)
+	var proporcion = max(0.4, float(salud_actual) / float(salud_maxima))
+	var escala_base = Vector3(1, 1, 1) * (0.6 + (0.4 * proporcion))
+	
+	# Se aplasta un poquito por el impacto y luego rebota a su escala base
+	tween_dano.tween_property(self, "scale", escala_base * 0.8, 0.05).set_trans(Tween.TRANS_SINE)
+	tween_dano.tween_property(self, "scale", escala_base, 0.15).set_trans(Tween.TRANS_BOUNCE)
 	
 	if salud_actual <= 0:
 		destruir()
@@ -19,52 +45,54 @@ func recibir_dano(cantidad: int):
 func destruir():
 	var mundo = get_parent()
 	
+	# Misma lógica exacta de tu mundo.gd para liberar la grilla magnética
 	var pos_llave = Vector3(
 		snapped(global_position.x, 0.1), 
 		1.0, 
 		snapped(global_position.z, 0.1)
 	)
 	
-	if mundo:
-		# 1. Liberamos la celda para poder volver a construir
+	if is_instance_valid(mundo):
 		if "celdas_ocupadas" in mundo:
 			mundo.celdas_ocupadas.erase(pos_llave)
 			
-		# 2. ¡NUEVO! Soltamos la chatarra en nuestra posición
 		if mundo.has_method("generar_chatarra"):
 			mundo.generar_chatarra(global_position)
 		
-	# 3. Nos eliminamos del juego
 	queue_free()
 
-# ¡NUEVO! Función para la Reparación Global
+# ==========================================================
+# 4. SISTEMA DE REPARACIÓN (Ingeniería)
+# ==========================================================
 func reparar(porcentaje: float):
 	var curacion = int(salud_maxima * porcentaje)
 	salud_actual += curacion
 	
-	# Nunca curamos más allá del 100%
 	if salud_actual > salud_maxima:
 		salud_actual = salud_maxima
 		
-	# Efecto visual: Recuperamos su tamaño original proporcionalmente a su salud
 	var proporcion_vida = float(salud_actual) / float(salud_maxima)
-	scale = Vector3(1, 1, 1) * (0.7 + (0.3 * proporcion_vida))
 	
-	# ¡NUEVO! El mecánico evalúa cuánto cuesta reparar esta barricada específica
+	# Animación suave de recuperación
+	if tween_dano: tween_dano.kill()
+	tween_dano = create_tween()
+	tween_dano.tween_property(self, "scale", Vector3(1, 1, 1) * (0.7 + (0.3 * proporcion_vida)), 0.3).set_trans(Tween.TRANS_BACK)
+
 func obtener_costo_reparacion(precio_actual_nueva: int) -> int:
 	if salud_actual >= salud_maxima:
-		return 0 # Si está intacta, cuesta $0
+		return 0 
 		
 	var hp_perdido = salud_maxima - salud_actual
 	var proporcion_dano = float(hp_perdido) / float(salud_maxima)
 	
-	# Cobramos un 60% del precio de una nueva (así siempre es más rentable reparar que comprar)
+	# Cobramos un 60% del precio de una nueva
 	var costo = int(precio_actual_nueva * proporcion_dano * 0.6)
+	return max(1, costo) # Mínimo $1
 	
-	return max(1, costo) # Mínimo cobramos $1 para que no haya arreglos gratis
-	
-	
-# Repara la estructura al 100%
 func reparar_completamente():
 	salud_actual = salud_maxima
-	scale = Vector3(1, 1, 1) # Restauramos su tamaño visual original
+	
+	# Restauramos su tamaño visual original con un rebote de satisfacción
+	if tween_dano: tween_dano.kill()
+	tween_dano = create_tween()
+	tween_dano.tween_property(self, "scale", Vector3(1, 1, 1), 0.4).set_trans(Tween.TRANS_BOUNCE)

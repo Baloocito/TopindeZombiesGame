@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://m7iaq62vu0hp"
-path="res://.godot/imported/CaraMoneda.png-9c7917d1ca6aeed4b4ce16476db47f5c.ctex"
+uid="uid://cwdx4nfe6bl2"
+path="res://.godot/imported/Inventario.png-42eb0c46d9856ca0ae721cbd2a920713.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/Moneda/CaraMoneda.png"
-dest_files=["res://.godot/imported/CaraMoneda.png-9c7917d1ca6aeed4b4ce16476db47f5c.ctex"]
+source_file="res://assets/ui_skins/skin_base/texturas/Inventario.png"
+dest_files=["res://.godot/imported/Inventario.png-42eb0c46d9856ca0ae721cbd2a920713.ctex"]
 
 [params]
 
