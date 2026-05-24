@@ -12,7 +12,7 @@ var dano: int = 10
 var tiempo_transcurrido: float = 0.0
 
 # ==========================================================
-# 2. INICIALIZACIÓN Y MOVIMIENTO CORREGIDO
+# 2. INICIALIZACIÓN Y MOVIMIENTO CORREGIDO hola
 # ==========================================================
 func _ready():
 	# Conexión blindada de señales de colisión física
