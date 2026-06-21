@@ -21,8 +21,9 @@ GuardadoGlobal="*uid://cx72602j8u0yg"
 
 [display]
 
-window/size/mode=3
-window/stretch/mode="canvas_items"
+window/size/viewport_width=1200
+window/size/viewport_height=900
+window/stretch/mode="viewport"
 window/handheld/orientation=4
 
 [global]

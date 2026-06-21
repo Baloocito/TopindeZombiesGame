@@ -5,8 +5,6 @@ extends Node3D
 # ==========================================================
 const TAMAÑO_GRILLA: float = 2.0
 
-# Mantenemos las bases de datos en memoria.
-# (Tip Pro: A futuro, esto se puede escalar a un Autoload/Singleton global).
 var bd_armas = {
 	"pistola": {"nombre": "Pistola 9mm", "tier": 1, "costo_ensamblaje": 0}, 
 	"escopeta": {"nombre": "Escopeta Vieja", "tier": 1, "costo_ensamblaje": 400},
@@ -19,7 +17,7 @@ var bd_armas = {
 	"riel": {"nombre": "Cañón de Riel", "tier": 4, "costo_ensamblaje": 5000},
 	"lanzagranadas": {"nombre": "Lanzagranadas", "tier": 4, "costo_ensamblaje": 5000}
 }
-var arma_inspeccionada: ArmaData = null
+var arma_inspeccionada = null
 var datos_estructuras = {
 	"madera": {"nombre": "Valla Madera", "precio": 150, "inflacion": 0.10, "hp": 500},
 	"puas": {"nombre": "Alambre Púas", "precio": 300, "inflacion": 0.15, "hp": 300},
@@ -41,6 +39,9 @@ var dinero_global: int = 10000
 var reparaciones_usadas: int = 0 
 var modificador_suerte: float = 0.0 
 
+# ¡NUEVO! DICCIONARIO DE VOTACIÓN PARA INICIAR LA NOCHE
+var jugadores_listos: Dictionary = {}
+
 var planos_desbloqueados: Array[String] = []
 var tienda_rotacion_actual: Array[String] = []
 var nivel_armas = {
@@ -49,7 +50,6 @@ var nivel_armas = {
 	"minigun": 1, "riel": 1, "lanzagranadas": 1
 }
 
-# Variables de construcción y colocación magnética
 var objeto_seleccionado_tienda: String = ""
 var torreta_seleccionada: Node3D = null 
 var construcciones_realizadas = { "madera": 0, "puas": 0, "barril": 0, "acero": 0, "electrico": 0, "torreta": 0 }
@@ -60,6 +60,7 @@ var celda_previa_tocada: Vector3 = Vector3.INF
 # 3. ENLACES A NODOS (UI y Escenas)
 # ==========================================================
 @export_category("Escenas de Entidades")
+@export var escena_jugador: PackedScene 
 @export var plano_arma_escena: PackedScene
 @export var caja_municion_escena: PackedScene 
 @export var botiquin_escena: PackedScene 
@@ -72,7 +73,6 @@ var celda_previa_tocada: Vector3 = Vector3.INF
 @export var escena_electrico: PackedScene
 @export var escena_torreta: PackedScene
 
-# --- Vistas Generales ---
 @onready var holograma = $Holograma
 @onready var cuadricula_visual = $CuadriculaVisual
 @onready var texto_game_over = $InterfazUI/TextoGameOver
@@ -81,14 +81,12 @@ var celda_previa_tocada: Vector3 = Vector3.INF
 @onready var texto_dinero = $InterfazUI/HudSuperiorDerecho/GrupoDinero/PanelDinero/LblDinero
 @onready var boton_reparar = $InterfazUI/BotonReparar 
 
-# --- HUD Gestión (Lateral) ---
 @onready var boton_pausa = $InterfazUI/HudLateralDerecho/BotonPausa
 @onready var boton_construir = $InterfazUI/HudLateralDerecho/BotonConstruir
 @onready var boton_mochila = $InterfazUI/HudLateralDerecho/BotonMochila
 @onready var boton_ensamblar = $InterfazUI/HudLateralDerecho/BotonEnsamblar
 @onready var boton_nivel = $InterfazUI/HudSuperiorIzquierdo/BotonNivel
 
-# --- HUD Combate (Inferior) ---
 @onready var hud_combate = $InterfazUI/EsquinaArmas
 @onready var slot_arma_1 = $InterfazUI/EsquinaArmas/ContenedorArmas/SlotArma1
 @onready var slot_arma_2 = $InterfazUI/EsquinaArmas/ContenedorArmas/SlotArma2
@@ -96,7 +94,6 @@ var celda_previa_tocada: Vector3 = Vector3.INF
 @onready var btn_recarga_izq = $InterfazUI/BotonRecargaIzquierdo
 @onready var btn_recarga_der = $InterfazUI/BotonRecargaDerecho
 
-# --- Paneles y Menús ---
 @onready var panel_fase = $InterfazUI/ContenedorAlertas/PanelFase
 @onready var lbl_titulo_fase = $InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/LblTituloFase
 @onready var lbl_zombies = $InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/CajaZombies/LblZombies
@@ -113,56 +110,95 @@ var celda_previa_tocada: Vector3 = Vector3.INF
 var tween_fase: Tween 
 
 # ==========================================================
+# 3.5. LÓGICA DE MULTIJUGADOR Y BÚSQUEDA LOCAL
+# ==========================================================
+func obtener_jugador_local():
+	var mi_id = str(multiplayer.get_unique_id())
+	var contenedor = get_node_or_null("ContenedorJugadores")
+	if contenedor and contenedor.has_node(mi_id):
+		return contenedor.get_node(mi_id)
+	return null
+
+func generar_jugadores_multijugador():
+	spawnear_jugador(1)
+	for id in multiplayer.get_peers():
+		spawnear_jugador(id)
+
+func spawnear_jugador(id: int):
+	var nuevo_jugador = escena_jugador.instantiate()
+	nuevo_jugador.name = str(id) 
+	$ContenedorJugadores.add_child(nuevo_jugador)
+	nuevo_jugador.global_position = Vector3(randf_range(-2.0, 2.0), 1.0, randf_range(-2.0, 2.0))
+
+# ==========================================================
 # 4. INICIALIZACIÓN
 # ==========================================================
 func _ready():
 	holograma.visible = false
 	panel_fase.visible = false
-	sumar_dinero(0)
-	fase_preparacion()
 	
+	# Aseguramos de que el botón iniciar esté conectado a la nueva función de votación
+	if boton_iniciar and not boton_iniciar.pressed.is_connected(_al_presionar_iniciar):
+		boton_iniciar.pressed.connect(_al_presionar_iniciar)
+		
 	conectar_botones_combate()
+	
+	if multiplayer.is_server():
+		# El Host configura la partida inicial y avisa a todos
+		generar_jugadores_multijugador()
+		sumar_dinero(0) 
+		fase_preparacion_en_red.rpc(1)
 
 func conectar_botones_combate():
-	# Lógica modular para la inyección de armas. Evita redundancia.
 	var equipar_lambda = func(slot_id: int):
-		var jugadores = get_tree().get_nodes_in_group("jugador")
-		if not jugadores.is_empty(): jugadores[0].equipar_arma_directa(slot_id)
+		var mi_jugador = obtener_jugador_local()
+		if mi_jugador: mi_jugador.equipar_arma_directa(slot_id)
 		
 	var recargar_lambda = func():
-		var jugadores = get_tree().get_nodes_in_group("jugador")
-		if not jugadores.is_empty() and jugadores[0].has_method("recargar_arma_actual"): 
-			jugadores[0].recargar_arma_actual()
+		var mi_jugador = obtener_jugador_local()
+		if mi_jugador and mi_jugador.has_method("recargar_arma_actual"): 
+			mi_jugador.recargar_arma_actual()
 
 	if slot_arma_1: slot_arma_1.pressed.connect(equipar_lambda.bind(0))
 	if slot_arma_2: slot_arma_2.pressed.connect(equipar_lambda.bind(1))
 	if slot_arma_3: slot_arma_3.pressed.connect(equipar_lambda.bind(2))
-	
 	if btn_recarga_izq: btn_recarga_izq.pressed.connect(recargar_lambda)
 	if btn_recarga_der: btn_recarga_der.pressed.connect(recargar_lambda)
 
 # ==========================================================
-# 5. GESTOR DE FASES (DÍA / NOCHE) Y UI
+# 5. GESTOR DE FASES Y SISTEMA DE VOTACIÓN (READY UP)
 # ==========================================================
-func cambiar_fase_ui(es_combate: bool):
-	# Encendido y apagado masivo de la interfaz a través de Arrays de Nodos
-	var ui_dia = [boton_iniciar, boton_construir, boton_mochila, boton_nivel, boton_ensamblar]
-	var ui_noche = [hud_combate, btn_recarga_izq, btn_recarga_der]
+func _al_presionar_iniciar():
+	# El jugador presiona, deshabilitamos su botón para evitar spam
+	boton_iniciar.disabled = true
+	boton_iniciar.text = "¡Listo!"
+	# Le enviamos el voto al Servidor
+	declarar_listo_servidor.rpc_id(1, multiplayer.get_unique_id())
+
+@rpc("any_peer", "reliable")
+func declarar_listo_servidor(id_jugador: int):
+	if not multiplayer.is_server(): return
 	
-	for elemento in ui_dia:
-		if is_instance_valid(elemento): elemento.visible = not es_combate
-		
-	for elemento in ui_noche:
-		if is_instance_valid(elemento): elemento.visible = es_combate
+	jugadores_listos[id_jugador] = true
+	var total_jugadores = multiplayer.get_peers().size() + 1 # Clientes + Host
+	var listos = jugadores_listos.size()
+	
+	# Actualizamos visualmente el botón para que todos vean cuántos faltan
+	actualizar_ui_listos.rpc(listos, total_jugadores)
+	
+	# Si todos votaron que sí, comienza la masacre
+	if listos >= total_jugadores:
+		jugadores_listos.clear()
+		iniciar_oleada_en_red.rpc()
 
-	# =========================================================
-	# ¡LA SOLUCIÓN DEL DISPARO! Controlamos el seguro del arma
-	# =========================================================
-	var jugadores = get_tree().get_nodes_in_group("jugador")
-	if not jugadores.is_empty() and jugadores[0].has_method("set_can_fire"):
-		jugadores[0].set_can_fire(es_combate)
+@rpc("call_local", "reliable")
+func actualizar_ui_listos(listos: int, totales: int):
+	if boton_iniciar and not boton_iniciar.disabled:
+		boton_iniciar.text = "Iniciar Noche (" + str(listos) + "/" + str(totales) + ")"
 
-func fase_preparacion():
+@rpc("call_local", "reliable")
+func fase_preparacion_en_red(nueva_oleada: int):
+	oleada_actual = nueva_oleada
 	fase_combate = false
 	modo_construccion = false
 	holograma.visible = false
@@ -172,26 +208,47 @@ func fase_preparacion():
 		repartir_experiencia_global(bono_supervivencia)
 	
 	animar_fase("DÍA " + str(oleada_actual) + ": PREPÁRATE", Color.WHITE)
-	
-	cambiar_fase_ui(false) # Entramos en modo Gestión
+	cambiar_fase_ui(false) 
 	
 	reparaciones_usadas = 0 
 	if boton_reparar:
 		boton_reparar.visible = true
 		actualizar_boton_reparacion()
+		
+	# Restauramos el botón de iniciar para la nueva oleada
+	if boton_iniciar:
+		boton_iniciar.disabled = false
+		boton_iniciar.text = "Iniciar Noche"
 
-func iniciar_oleada():
+@rpc("call_local", "reliable")
+func iniciar_oleada_en_red():
 	fase_combate = true
 	modo_construccion = false 
 	holograma.visible = false
 	cerrar_menu_lateral()
 	animar_fase("NOCHE ETERNA: OLEADA " + str(oleada_actual), Color(1, 0.2, 0.2))
 	
-	cambiar_fase_ui(true) # Entramos en modo Combate
+	cambiar_fase_ui(true)
 	if boton_reparar: boton_reparar.visible = false
 	
-	zombies_vivos = $GeneradorZombies.preparar_oleada(oleada_actual)
-	$GeneradorZombies.iniciar_generacion()
+	# SOLO el servidor spawnea los zombies
+	if multiplayer.is_server():
+		zombies_vivos = $GeneradorZombies.preparar_oleada(oleada_actual)
+		$GeneradorZombies.iniciar_generacion()
+
+func cambiar_fase_ui(es_combate: bool):
+	var ui_dia = [boton_iniciar, boton_construir, boton_mochila, boton_nivel, boton_ensamblar]
+	var ui_noche = [hud_combate, btn_recarga_izq, btn_recarga_der]
+	
+	for elemento in ui_dia:
+		if is_instance_valid(elemento): elemento.visible = not es_combate
+		
+	for elemento in ui_noche:
+		if is_instance_valid(elemento): elemento.visible = es_combate
+
+	var mi_jugador = obtener_jugador_local()
+	if mi_jugador and mi_jugador.has_method("set_can_fire"):
+		mi_jugador.set_can_fire(es_combate)
 
 func animar_fase(titulo: String, color_texto: Color):
 	lbl_titulo_fase.text = titulo
@@ -212,8 +269,14 @@ func animar_fase(titulo: String, color_texto: Color):
 # 6. SISTEMA DE ECONOMÍA, PROGRESIÓN Y REPARACIÓN
 # ==========================================================
 func sumar_dinero(cantidad: int):
+	if not multiplayer.is_server(): return 
 	dinero_global += cantidad
-	texto_dinero.text = str(dinero_global) + "G"
+	actualizar_dinero_para_todos.rpc(dinero_global)
+
+@rpc("authority", "call_local", "reliable")
+func actualizar_dinero_para_todos(nuevo_valor: int):
+	dinero_global = nuevo_valor
+	if texto_dinero: texto_dinero.text = str(dinero_global) + "G"
 	actualizar_boton_reparacion()
 
 func repartir_experiencia_global(cantidad: int):
@@ -246,10 +309,27 @@ func actualizar_boton_reparacion():
 		boton_reparar.text = "Reparar Todo ($" + str(costo) + ")"
 		boton_reparar.disabled = (dinero_global < costo or usos_restantes <= 0)
 
+# ¡NUEVO! Sincronizado para red
 func ejecutar_reparacion_global():
 	var costo = obtener_costo_reparacion()
 	if costo == 0 or dinero_global < costo or reparaciones_usadas >= 1: return
-	sumar_dinero(-costo)
+	
+	# Enviamos la petición al servidor si somos cliente
+	if not multiplayer.is_server():
+		solicitar_reparacion_servidor.rpc_id(1)
+	else:
+		solicitar_reparacion_servidor()
+
+@rpc("any_peer", "reliable")
+func solicitar_reparacion_servidor():
+	if not multiplayer.is_server(): return
+	var costo = obtener_costo_reparacion()
+	if dinero_global >= costo and reparaciones_usadas < 1:
+		sumar_dinero(-costo)
+		ejecutar_reparacion_en_red.rpc()
+
+@rpc("call_local", "reliable")
+func ejecutar_reparacion_en_red():
 	reparaciones_usadas += 1
 	var barricadas = get_tree().get_nodes_in_group("barricadas")
 	for barricada in barricadas:
@@ -258,9 +338,11 @@ func ejecutar_reparacion_global():
 	actualizar_boton_reparacion()
 
 # ==========================================================
-# 7. GENERACIÓN DE LOOT (Director de IA)
+# 7. GENERACIÓN DE LOOT E IA DE COMBATE (Cerebro del Host)
 # ==========================================================
 func spawn_loot(pos_muerte: Vector3, tipo_zombie: String):
+	if not multiplayer.is_server(): return # Blindaje total
+	
 	var bounty: int = 0; var oro_base: int = 0; var xp_ganada: int = 0 
 	match tipo_zombie:
 		"basico": bounty = 10; oro_base = 25; xp_ganada = 5
@@ -278,33 +360,30 @@ func spawn_loot(pos_muerte: Vector3, tipo_zombie: String):
 	
 	var umbral_municion = 61.0 
 	var umbral_botiquin = 86.0 
-	var umbral_plano = 96.0    
+	var umbral_plano = 96.0   
 	
-	var jugadores = get_tree().get_nodes_in_group("jugador")
-	var jugador = null
+	var jugador_base = get_node_or_null("ContenedorJugadores/1")
 	
-	if not jugadores.is_empty():
-		jugador = jugadores[0]
-		if "salud_actual" in jugador and "stat_salud_maxima" in jugador:
-			if jugador.salud_actual <= (jugador.stat_salud_maxima * 0.3):
+	if jugador_base:
+		if "salud_actual" in jugador_base and "stat_salud_maxima" in jugador_base:
+			if jugador_base.salud_actual <= (jugador_base.stat_salud_maxima * 0.3):
 				umbral_botiquin = 60.0 
 				umbral_municion = 96.0 
-		elif jugador.arma_actual:
-			var tipo_balas = jugador.arma_actual.tipo_municion
-			var reserva = jugador.municion_reserva.get(tipo_balas, 0)
-			if reserva <= jugador.arma_actual.tamano_cargador:
+		elif jugador_base.arma_actual:
+			var tipo_balas = jugador_base.arma_actual.tipo_municion
+			var reserva = jugador_base.municion_reserva.get(tipo_balas, 0)
+			if reserva <= jugador_base.arma_actual.tamano_cargador:
 				umbral_municion = 40.0 
 
-	# Reparto de Dropeos físicos
 	if (dado_loot >= umbral_municion and dado_loot < umbral_botiquin) and not es_elite:
 		if caja_municion_escena:
 			var caja = caja_municion_escena.instantiate()
 			get_parent().add_child(caja)
 			caja.global_position = pos_muerte + Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
-			if jugador and jugador.arma_actual:
-				var multiplicador = 3 if jugador.arma_actual.tipo_municion == "ligera" else 2
-				var cantidad = jugador.arma_actual.tamano_cargador * multiplicador
-				if caja.has_method("configurar"): caja.configurar(jugador.arma_actual.tipo_municion, cantidad)
+			if jugador_base and jugador_base.arma_actual:
+				var multiplicador = 3 if jugador_base.arma_actual.tipo_municion == "ligera" else 2
+				var cantidad = jugador_base.arma_actual.tamano_cargador * multiplicador
+				if caja.has_method("configurar"): caja.configurar(jugador_base.arma_actual.tipo_municion, cantidad)
 			solto_algo = true
 			
 	elif (dado_loot >= umbral_botiquin and dado_loot < umbral_plano) and not es_elite:
@@ -322,7 +401,7 @@ func spawn_loot(pos_muerte: Vector3, tipo_zombie: String):
 			plano.global_position = pos_muerte + Vector3(0, 0.5, 0) 
 			
 			var nivel_jugador = 1
-			if jugador: nivel_jugador = jugador.nivel
+			if jugador_base: nivel_jugador = jugador_base.nivel
 			
 			var tier_maximo = 2
 			if nivel_jugador >= 20: tier_maximo = 4
@@ -333,7 +412,6 @@ func spawn_loot(pos_muerte: Vector3, tipo_zombie: String):
 
 	modificador_suerte = 0.0 if solto_algo else modificador_suerte + 0.5
 
-	# Oro garantizado (Dinámico)
 	var variacion_dinero = randf_range(0.8, 1.2)
 	var oro_final = int((oro_base * variacion_dinero) * (1.0 + (0.15 * (oleada_actual - 1))))
 	
@@ -344,6 +422,7 @@ func spawn_loot(pos_muerte: Vector3, tipo_zombie: String):
 		moneda.valor_oro = oro_final 
 		
 func generar_chatarra(posicion_destruccion: Vector3):
+	if not multiplayer.is_server(): return
 	if moneda_escena:
 		var chatarra = moneda_escena.instantiate()
 		add_child(chatarra)
@@ -351,25 +430,34 @@ func generar_chatarra(posicion_destruccion: Vector3):
 		chatarra.valor_oro = 20
 
 func zombie_eliminado():
+	if not multiplayer.is_server(): return
+	
 	GuardadoGlobal.zombies_totales += 1
 	zombies_asesinados_partida += 1
-	lbl_zombies.text = str(zombies_asesinados_partida)
+	actualizar_ui_zombies.rpc(zombies_asesinados_partida)
 	
 	zombies_vivos -= 1
 	if zombies_vivos <= 0:
 		oleada_actual += 1
-		fase_preparacion()
+		# Pasamos a la siguiente fase para todos
+		fase_preparacion_en_red.rpc(oleada_actual)
+
+@rpc("call_local", "reliable")
+func actualizar_ui_zombies(asesinados: int):
+	zombies_asesinados_partida = asesinados
+	if lbl_zombies: lbl_zombies.text = str(zombies_asesinados_partida)
 
 func ejecutar_game_over():
-	$GeneradorZombies/TimerSpawn.stop()
-	if oleada_actual > GuardadoGlobal.record_oleada:
-		GuardadoGlobal.record_oleada = oleada_actual
-	GuardadoGlobal.guardar_datos()
+	if multiplayer.is_server():
+		$GeneradorZombies/TimerSpawn.stop()
+		if oleada_actual > GuardadoGlobal.record_oleada:
+			GuardadoGlobal.record_oleada = oleada_actual
+		GuardadoGlobal.guardar_datos()
 	
 	texto_game_over.visible = true
 	boton_reiniciar.visible = true
 	
-	cambiar_fase_ui(false) # Escondemos todo para que no estorbe en el Game Over
+	cambiar_fase_ui(false)
 	boton_iniciar.visible = false
 	boton_construir.visible = false
 
@@ -420,14 +508,39 @@ func animar_cuadricula(mostrar: bool):
 func construir_estructura():
 	if objeto_seleccionado_tienda == "": return
 	
-	var costo_actual = obtener_precio_estructura(objeto_seleccionado_tienda)
-	if dinero_global < costo_actual: return 
-		
 	var pos_llave = Vector3(snapped(holograma.global_position.x, 0.1), 1.0, snapped(holograma.global_position.z, 0.1))
+	
+	var multiplicador_ingenieria = 1.0
+	var mi_jugador = obtener_jugador_local()
+	if mi_jugador and "stat_ingenieria" in mi_jugador:
+		multiplicador_ingenieria = mi_jugador.stat_ingenieria
+
+	if multiplayer.is_server():
+		solicitar_construccion(objeto_seleccionado_tienda, pos_llave, holograma.global_position, multiplicador_ingenieria)
+	else:
+		solicitar_construccion.rpc_id(1, objeto_seleccionado_tienda, pos_llave, holograma.global_position, multiplicador_ingenieria)
+	
+	celda_previa_tocada = Vector3.INF
+	holograma.visible = false
+	animar_cuadricula(false)
+	modo_construccion = false
+	boton_construir.modulate = Color.WHITE
+
+@rpc("any_peer", "reliable")
+func solicitar_construccion(tipo: String, pos_llave: Vector3, pos_real: Vector3, mult_ing: float):
+	if not multiplayer.is_server(): return
+	
+	var costo_actual = obtener_precio_estructura(tipo)
+	if dinero_global < costo_actual: return 
 	if celdas_ocupadas.has(pos_llave): return
 	
+	sumar_dinero(-costo_actual)
+	ejecutar_construccion_en_red.rpc(tipo, pos_llave, pos_real, mult_ing)
+
+@rpc("call_local", "reliable")
+func ejecutar_construccion_en_red(tipo: String, pos_llave: Vector3, pos_real: Vector3, mult_ing: float):
 	var escena_a_crear = null
-	match objeto_seleccionado_tienda:
+	match tipo:
 		"madera": escena_a_crear = escena_madera
 		"puas": escena_a_crear = escena_puas
 		"barril": escena_a_crear = escena_barril
@@ -437,30 +550,24 @@ func construir_estructura():
 		
 	if not escena_a_crear: return
 		
-	sumar_dinero(-costo_actual)
-	construcciones_realizadas[objeto_seleccionado_tienda] += 1
+	construcciones_realizadas[tipo] += 1
 		
 	var nuevo_edificio = escena_a_crear.instantiate()
 	if "tipo_estructura" in nuevo_edificio:
-		nuevo_edificio.tipo_estructura = objeto_seleccionado_tienda
+		nuevo_edificio.tipo_estructura = tipo
 		
 	add_child(nuevo_edificio)
-	nuevo_edificio.global_position = holograma.global_position
+	nuevo_edificio.global_position = pos_real
 	celdas_ocupadas[pos_llave] = true
 	
-	var hp_oficial = datos_estructuras[objeto_seleccionado_tienda]["hp"]
-	var multiplicador_ingenieria = 1.0
-	var jugadores = get_tree().get_nodes_in_group("jugador")
-	if not jugadores.is_empty() and "stat_ingenieria" in jugadores[0]:
-		multiplicador_ingenieria = jugadores[0].stat_ingenieria
-		
-	var hp_final = int(hp_oficial * multiplicador_ingenieria)
+	var hp_oficial = datos_estructuras[tipo]["hp"]
+	var hp_final = int(hp_oficial * mult_ing)
+	
 	if "salud_maxima" in nuevo_edificio:
 		nuevo_edificio.salud_maxima = hp_final
 		nuevo_edificio.salud_actual = hp_final
 	
 	actualizar_boton_reparacion()
-	
 	celda_previa_tocada = Vector3.INF 
 	var costo_siguiente = obtener_precio_estructura(objeto_seleccionado_tienda)
 	holograma.material_override.albedo_color = Color(0, 1, 0, 0.6) if dinero_global >= costo_siguiente else Color(1, 0, 0, 0.6)
@@ -491,32 +598,35 @@ func _unhandled_input(event):
 					holograma.material_override.albedo_color = Color(0, 1, 0, 0.6) if dinero_global >= costo_actual else Color(1, 0, 0, 0.6)
 
 # ==========================================================
-# 9. SISTEMA DE MENÚS (Dinámico y Escalable)
+# 9. SISTEMA DE MENÚS (Independientes por jugador)
 # ==========================================================
-
 func _on_boton_cerrar_pressed() -> void: cerrar_menu_lateral()
-func _on_boton_mochila_pressed() -> void: abrir_menu_interactivo(menu_armeria, actualizar_lista_armeria)
-func _on_boton_construir_pressed(): alternar_modo_construccion()
-func _on_boton_nivel_pressed() -> void: abrir_menu_interactivo(menu_nivel, actualizar_lista_nivel)
-func _on_boton_ensamblar_pressed() -> void: abrir_menu_interactivo(menu_ensamblaje, actualizar_lista_ensamblaje)
-func _on_boton_pausa_pressed() -> void: if menu_pausa: menu_pausa.alternar_pausa()
 
+func _on_boton_mochila_pressed() -> void: 
+	if obtener_jugador_local(): abrir_menu_interactivo(menu_armeria, actualizar_lista_armeria)
+
+func _on_boton_construir_pressed(): 
+	alternar_modo_construccion()
+
+func _on_boton_nivel_pressed() -> void: 
+	if obtener_jugador_local(): abrir_menu_interactivo(menu_nivel, actualizar_lista_nivel)
+
+func _on_boton_ensamblar_pressed() -> void: 
+	if obtener_jugador_local(): abrir_menu_interactivo(menu_ensamblaje, actualizar_lista_ensamblaje)
+
+func _on_boton_pausa_pressed() -> void: 
+	if menu_pausa: menu_pausa.alternar_pausa()
+	
 func cerrar_menu_lateral():
 	if panel_lateral: panel_lateral.visible = false
 
-# ¡NUEVO! Cerebro dinámico que reemplaza 5 funciones repetitivas.
 func abrir_menu_interactivo(menu_activo: Control, funcion_generadora: Callable):
 	if fase_combate: return
-	
 	panel_lateral.visible = true
 	var todos_los_menus = [menu_armeria, menu_construccion, menu_inspector, menu_nivel, menu_ensamblaje]
-	
-	# Apaga todos los menús excepto el que pediste abrir
 	for menu in todos_los_menus:
 		if is_instance_valid(menu):
 			menu.visible = (menu == menu_activo)
-			
-	# Llama a la función específica (ej. actualizar_lista_armeria)
 	funcion_generadora.call()
 
 func abrir_menu_inspector(torreta_tocada: Node3D):
@@ -528,9 +638,8 @@ func abrir_menu_inspector(torreta_tocada: Node3D):
 # ==========================================================
 func actualizar_lista_armeria():
 	for hijo in menu_armeria.get_children(): hijo.queue_free()
-	var jugadores = get_tree().get_nodes_in_group("jugador")
-	if jugadores.is_empty(): return
-	var jugador = jugadores[0]
+	var mi_jugador = obtener_jugador_local()
+	if not mi_jugador: return
 	
 	var titulo = Label.new()
 	titulo.text = "ARMARIO TÁCTICO"
@@ -543,17 +652,14 @@ func actualizar_lista_armeria():
 	separador.add_theme_constant_override("separation", 15)
 	menu_armeria.add_child(separador)
 	
-	for arma in jugador.armas_inventario:
+	for arma in mi_jugador.armas_inventario:
 		var fila = HBoxContainer.new() 
-		
-		# Convertimos el nombre en un botón interactivo
 		var btn_nombre = Button.new()
 		var prefijo = "▼ " if arma_inspeccionada == arma else "▶ "
 		btn_nombre.text = prefijo + arma.nombre 
 		btn_nombre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn_nombre.add_theme_font_size_override("font_size", 18)
 		
-		# Lógica para abrir/cerrar el visor de estadísticas
 		btn_nombre.pressed.connect(func():
 			arma_inspeccionada = null if arma_inspeccionada == arma else arma
 			actualizar_lista_armeria()
@@ -565,12 +671,12 @@ func actualizar_lista_armeria():
 			var btn_slot = Button.new()
 			btn_slot.text = str(i + 1) 
 			btn_slot.custom_minimum_size = Vector2(45, 45)
-			if jugador.armas_equipadas[i] == arma:
+			if mi_jugador.armas_equipadas[i] == arma:
 				btn_slot.modulate = Color(0.2, 1, 0.2)
 			
 			btn_slot.pressed.connect(func():
-				jugador.equipar_en_slot(arma, i)
-				if jugador.slot_actual == i: jugador.cambiar_arma(i)
+				mi_jugador.equipar_en_slot(arma, i)
+				if mi_jugador.slot_actual == i: mi_jugador.cambiar_arma(i)
 				actualizar_lista_armeria()
 			)
 			caja_slots.add_child(btn_slot)
@@ -578,31 +684,24 @@ func actualizar_lista_armeria():
 		fila.add_child(caja_slots)
 		menu_armeria.add_child(fila)
 		
-		# =========================================================
-		# EL VISOR DE ESTADÍSTICAS DESPLEGABLE
-		# =========================================================
 		if arma_inspeccionada == arma:
 			var panel_stats = PanelContainer.new()
 			var vbox_stats = VBoxContainer.new()
 			panel_stats.add_child(vbox_stats)
 			
-			# Espacio preparado para el arte Low Poly con borde negro grueso
 			var rect_img = ColorRect.new()
 			rect_img.custom_minimum_size = Vector2(0, 80)
-			rect_img.color = Color(0.15, 0.15, 0.15) # Fondo oscuro
+			rect_img.color = Color(0.15, 0.15, 0.15) 
 			
 			var lbl_img = Label.new()
 			lbl_img.text = "[ ESPACIO PARA ICONO TOON ]"
 			lbl_img.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			lbl_img.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			
-			# ¡AQUÍ ESTABA EL ERROR! (Faltaba "Control.")
 			lbl_img.set_anchors_preset(Control.PRESET_FULL_RECT) 
 			
 			rect_img.add_child(lbl_img)
 			vbox_stats.add_child(rect_img)
 			
-			# Datos RPG en tiempo real
 			var lbl_datos = Label.new()
 			lbl_datos.text = "Daño: %d\nCadencia: %.1f bps\nCargador: %d balas\nRecarga: %.2f s" % [arma.dano, arma.cadencia, arma.tamano_cargador, arma.tiempo_recarga]
 			lbl_datos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -652,9 +751,8 @@ func actualizar_lista_inspector():
 		cerrar_menu_lateral()
 		return
 		
-	var jugadores = get_tree().get_nodes_in_group("jugador")
-	if jugadores.is_empty(): return
-	var jugador = jugadores[0]
+	var mi_jugador = obtener_jugador_local()
+	if not mi_jugador: return
 	
 	var titulo = Label.new()
 	titulo.text = "CENTINELA"
@@ -679,7 +777,7 @@ func actualizar_lista_inspector():
 	
 	if torreta_seleccionada.arma_equipada != null:
 		var tipo_municion = torreta_seleccionada.arma_equipada.tipo_municion
-		var reserva_jugador = jugador.municion_reserva.get(tipo_municion, 0)
+		var reserva_jugador = mi_jugador.municion_reserva.get(tipo_municion, 0)
 		var btn_recargar = Button.new()
 		btn_recargar.text = "Dar 30 Balas %s\n(Tu reserva: %s)" % [tipo_municion, reserva_jugador]
 		btn_recargar.custom_minimum_size = Vector2(0, 50)
@@ -688,9 +786,9 @@ func actualizar_lista_inspector():
 		if reserva_jugador < 30: btn_recargar.disabled = true
 			
 		btn_recargar.pressed.connect(func():
-			jugador.municion_reserva[tipo_municion] -= 30
+			mi_jugador.municion_reserva[tipo_municion] -= 30
 			torreta_seleccionada.balas_cargadas += 30
-			jugador.actualizar_ui_municion()
+			mi_jugador.actualizar_ui_municion()
 			actualizar_lista_inspector() 
 		)
 		menu_inspector.add_child(btn_recargar)
@@ -704,9 +802,10 @@ func actualizar_lista_inspector():
 	var subtitulo_armas = Label.new()
 	subtitulo_armas.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	menu_inspector.add_child(subtitulo_armas)
+	
 	if torreta_seleccionada.arma_equipada == null:
 		subtitulo_armas.text = "\n-- INSTALAR ARMA --"
-		for arma in jugador.armas_inventario:
+		for arma in mi_jugador.armas_inventario:
 			var btn_arma = Button.new()
 			btn_arma.text = "Instalar " + arma.nombre
 			btn_arma.custom_minimum_size = Vector2(0, 40)
@@ -715,14 +814,14 @@ func actualizar_lista_inspector():
 			btn_arma.pressed.connect(func():
 				torreta_seleccionada.arma_equipada = arma.duplicate()
 				if arma.nombre != "Pistola 9mm":
-					jugador.armas_inventario.erase(arma)
+					mi_jugador.armas_inventario.erase(arma)
 					for i in range(3):
-						if jugador.armas_equipadas[i] == arma:
-							jugador.armas_equipadas[i] = null
-							if jugador.slot_actual == i:
-								jugador.arma_actual = null 
-								jugador.actualizar_ui_municion() 
-								jugador.ciclo_arma_rapido() 
+						if mi_jugador.armas_equipadas[i] == arma:
+							mi_jugador.armas_equipadas[i] = null
+							if mi_jugador.slot_actual == i:
+								mi_jugador.arma_actual = null 
+								mi_jugador.actualizar_ui_municion() 
+								mi_jugador.ciclo_arma_rapido() 
 				actualizar_lista_inspector()
 			)
 			menu_inspector.add_child(btn_arma)
@@ -736,12 +835,12 @@ func actualizar_lista_inspector():
 		btn_recuperar.pressed.connect(func():
 			if torreta_seleccionada.balas_cargadas > 0:
 				var tipo_bala = torreta_seleccionada.arma_equipada.tipo_municion
-				jugador.municion_reserva[tipo_bala] += torreta_seleccionada.balas_cargadas
+				mi_jugador.municion_reserva[tipo_bala] += torreta_seleccionada.balas_cargadas
 				torreta_seleccionada.balas_cargadas = 0
-				jugador.actualizar_ui_municion()
+				mi_jugador.actualizar_ui_municion()
 			
 			if torreta_seleccionada.arma_equipada.nombre != "Pistola 9mm":
-				jugador.armas_inventario.append(torreta_seleccionada.arma_equipada)
+				mi_jugador.armas_inventario.append(torreta_seleccionada.arma_equipada)
 				
 			torreta_seleccionada.arma_equipada = null
 			actualizar_lista_inspector()
@@ -750,9 +849,8 @@ func actualizar_lista_inspector():
 
 func actualizar_lista_nivel():
 	for hijo in menu_nivel.get_children(): hijo.queue_free()
-	var jugadores = get_tree().get_nodes_in_group("jugador")
-	if jugadores.is_empty(): return
-	var jugador = jugadores[0]
+	var mi_jugador = obtener_jugador_local()
+	if not mi_jugador: return
 	
 	var titulo = Label.new()
 	titulo.text = "ATRIBUTOS"
@@ -762,9 +860,9 @@ func actualizar_lista_nivel():
 	menu_nivel.add_child(titulo)
 	
 	var lbl_puntos = Label.new()
-	lbl_puntos.text = "Puntos Disponibles: " + str(jugador.puntos_mejora)
+	lbl_puntos.text = "Puntos Disponibles: " + str(mi_jugador.puntos_mejora)
 	lbl_puntos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	if jugador.puntos_mejora > 0: lbl_puntos.modulate = Color(1, 1, 0) 
+	if mi_jugador.puntos_mejora > 0: lbl_puntos.modulate = Color(1, 1, 0) 
 	menu_nivel.add_child(lbl_puntos)
 	
 	var separador = HSeparator.new()
@@ -772,11 +870,11 @@ func actualizar_lista_nivel():
 	menu_nivel.add_child(separador)
 	
 	var stats_ui = [
-		{"id": "salud", "nombre": "Salud Máxima", "valor": str(jugador.stat_salud_maxima) + " HP"},
-		{"id": "agilidad", "nombre": "Agilidad", "valor": str(jugador.stat_agilidad).pad_decimals(1) + " m/s"},
-		{"id": "destreza", "nombre": "Destreza", "valor": str(int(jugador.stat_destreza * 100)) + "%"},
-		{"id": "ingenieria", "nombre": "Ingeniería", "valor": "x" + str(jugador.stat_ingenieria).pad_decimals(1)},
-		{"id": "recoleccion", "nombre": "Imán de Oro", "valor": str(jugador.stat_recoleccion).pad_decimals(1) + " m"}
+		{"id": "salud", "nombre": "Salud Máxima", "valor": str(mi_jugador.stat_salud_maxima) + " HP"},
+		{"id": "agilidad", "nombre": "Agilidad", "valor": str(mi_jugador.stat_agilidad).pad_decimals(1) + " m/s"},
+		{"id": "destreza", "nombre": "Destreza", "valor": str(int(mi_jugador.stat_destreza * 100)) + "%"},
+		{"id": "ingenieria", "nombre": "Ingeniería", "valor": "x" + str(mi_jugador.stat_ingenieria).pad_decimals(1)},
+		{"id": "recoleccion", "nombre": "Imán de Oro", "valor": str(mi_jugador.stat_recoleccion).pad_decimals(1) + " m"}
 	]
 	
 	for stat in stats_ui:
@@ -790,10 +888,10 @@ func actualizar_lista_nivel():
 		var btn_mejorar = Button.new()
 		btn_mejorar.text = " + "
 		btn_mejorar.custom_minimum_size = Vector2(50, 50) 
-		if jugador.puntos_mejora <= 0: btn_mejorar.disabled = true
+		if mi_jugador.puntos_mejora <= 0: btn_mejorar.disabled = true
 			
 		btn_mejorar.pressed.connect(func():
-			jugador.mejorar_estadistica(stat["id"])
+			mi_jugador.mejorar_estadistica(stat["id"])
 			actualizar_lista_nivel() 
 		)
 		fila.add_child(btn_mejorar)
@@ -805,9 +903,8 @@ func actualizar_lista_nivel():
 func actualizar_lista_ensamblaje():
 	for hijo in menu_ensamblaje.get_children(): hijo.queue_free()
 	
-	var jugadores = get_tree().get_nodes_in_group("jugador")
-	if jugadores.is_empty(): return
-	var jugador = jugadores[0]
+	var mi_jugador = obtener_jugador_local()
+	if not mi_jugador: return
 	
 	var titulo = Label.new()
 	titulo.text = "MESA DE TRABAJO"
@@ -839,22 +936,15 @@ func actualizar_lista_ensamblaje():
 		var costo_ensamblar = datos["costo_ensamblaje"]
 		var costo_mejorar = int(costo_ensamblar * 0.6) 
 		
-		# =========================================================
-		# 1. ESCÁNER DE INVENTARIO (¿Ya tenemos esta arma?)
-		# =========================================================
-		var arma_poseida: ArmaData = null
-		for arma in jugador.armas_inventario:
+		var arma_poseida = null
+		for arma in mi_jugador.armas_inventario:
 			if arma.nombre == datos["nombre"]:
 				arma_poseida = arma
 				break
 				
-		# =========================================================
-		# 2. VISOR DE ESTADÍSTICAS RPG
-		# =========================================================
 		var lbl_info = Label.new()
 		var texto_info = "► " + datos["nombre"] + " (x" + str(cantidad) + " Planos)\n"
 		
-		# Si la tenemos, mostramos su daño real. Si no, mostramos nivel 0.
 		if arma_poseida:
 			texto_info += "Nivel: " + str(lvl_actual) + " | Daño: " + str(arma_poseida.dano)
 		else:
@@ -866,16 +956,12 @@ func actualizar_lista_ensamblaje():
 		var fila_botones = HBoxContainer.new()
 		fila_botones.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		
-		# =========================================================
-		# 3. LÓGICA CONDICIONAL DE BOTONES
-		# =========================================================
 		if not arma_poseida:
-			# --- SOLO MOSTRAR BOTÓN CREAR ---
 			var btn_crear = Button.new()
 			btn_crear.text = "Ensamblar\n$" + str(costo_ensamblar)
 			btn_crear.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			btn_crear.custom_minimum_size = Vector2(0, 50)
-			btn_crear.modulate = Color(0.5, 1.0, 0.5) # Verde para objetos nuevos
+			btn_crear.modulate = Color(0.5, 1.0, 0.5) 
 			if dinero_global < costo_ensamblar: btn_crear.disabled = true
 				
 			btn_crear.pressed.connect(func():
@@ -884,14 +970,13 @@ func actualizar_lista_ensamblaje():
 				var nueva_arma = load(ruta_arma)
 				if nueva_arma:
 					var arma_clonada = nueva_arma.duplicate()
-					jugador.armas_inventario.append(arma_clonada)
+					mi_jugador.armas_inventario.append(arma_clonada)
 					planos_desbloqueados.erase(clave) 
 					actualizar_lista_ensamblaje()
 			)
 			fila_botones.add_child(btn_crear)
 			
 		else:
-			# --- SOLO MOSTRAR BOTÓN MEJORAR (CON RULETA RNG) ---
 			var btn_mejorar = Button.new()
 			btn_mejorar.text = "Forjar Mejora Aleatoria\n$" + str(costo_mejorar)
 			btn_mejorar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -904,31 +989,21 @@ func actualizar_lista_ensamblaje():
 				nivel_armas[clave] += 1 
 				planos_desbloqueados.erase(clave) 
 				
-				# 1. Tiramos los dados para elegir qué estadística mejora
 				var stats_posibles = ["dano", "cadencia", "tamano_cargador", "tiempo_recarga"]
 				var stat_elegida = stats_posibles.pick_random()
-				
-				# 2. Multiplicador de mejora basado en el Tier del arma (0.1 a 1.0)
-				# Un arma de Tier 4 puede recibir mejoras mucho más grandes que una de Tier 1.
 				var bono_rng = randf_range(0.1, 0.4) + (datos["tier"] * 0.1)
 				
-				# 3. Aplicamos la mejora específica a la estadística ganadora
 				match stat_elegida:
 					"dano":
 						arma_poseida.dano += max(1, int(arma_poseida.dano * bono_rng))
-						print("Mejora RNG: DAÑO de ", arma_poseida.nombre, " subió a ", arma_poseida.dano)
 					"cadencia":
 						arma_poseida.cadencia += (arma_poseida.cadencia * bono_rng)
-						print("Mejora RNG: CADENCIA de ", arma_poseida.nombre, " subió a ", arma_poseida.cadencia)
 					"tamano_cargador":
 						arma_poseida.tamano_cargador += max(1, int(arma_poseida.tamano_cargador * bono_rng))
-						print("Mejora RNG: CARGADOR de ", arma_poseida.nombre, " subió a ", arma_poseida.tamano_cargador)
 					"tiempo_recarga":
-						# La recarga mejora reduciendo el tiempo (nunca debe llegar a 0)
 						arma_poseida.tiempo_recarga = max(0.1, arma_poseida.tiempo_recarga - (arma_poseida.tiempo_recarga * (bono_rng * 0.5)))
-						print("Mejora RNG: RECARGA de ", arma_poseida.nombre, " bajó a ", arma_poseida.tiempo_recarga)
 				
-				jugador.actualizar_ui_municion() 
+				mi_jugador.actualizar_ui_municion() 
 				actualizar_lista_ensamblaje()
 			)
 			fila_botones.add_child(btn_mejorar)

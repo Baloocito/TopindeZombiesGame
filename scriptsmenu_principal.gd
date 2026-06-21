@@ -12,8 +12,9 @@ func _ready():
 # ==========================================
 
 func _on_boton_jugar_pressed():
-	# ¡Nos vamos al juego! Cambia "mundo.tscn" por el nombre exacto de tu escena principal
-	get_tree().change_scene_to_file("res://scenes/mundo.tscn")
+	# ¡Ahora pasamos a la sala de espera multijugador primero!
+	get_tree().change_scene_to_file("res://scenes/Lobby.tscn") 
+	# OJO: Asegúrate de que la ruta "res://Lobby.tscn" coincida exactamente con donde tienes guardada tu escena del Lobby.
 
 func _on_boton_ranking_pressed():
 	# Leemos directamente la variable de nuestro Singleton

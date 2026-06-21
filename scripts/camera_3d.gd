@@ -11,31 +11,42 @@ extends Camera3D
 
 var offset: Vector3
 var punto_enfoque: Vector3
-
-func _ready():
-	if objetivo:
-		offset = global_position - objetivo.global_position
-		punto_enfoque = objetivo.global_position
+var inicializado: bool = false
 
 func _physics_process(delta):
+	# 1. Si la cámara no tiene un objetivo asignado, lo buscamos dinámicamente
 	if not objetivo:
-		return
+		var mi_id = str(multiplayer.get_unique_id()) # Obtenemos tu número de jugador
+		var contenedor = get_node_or_null("../ContenedorJugadores") # Buscamos la carpeta de clones
+		
+		# Si la carpeta existe y tu clon ya fue generado...
+		if contenedor and contenedor.has_node(mi_id):
+			objetivo = contenedor.get_node(mi_id) # ¡Enganchamos el objetivo!
+			
+			# Calculamos las matemáticas iniciales (solo se hace una vez)
+			offset = global_position - objetivo.global_position
+			punto_enfoque = objetivo.global_position
+			inicializado = true
+			current = true # Encendemos esta cámara
+			
+		return # Pausamos la cámara hasta que encuentre al jugador
 
-	var pos_jugador = objetivo.global_position
+	# 2. Si ya encontramos al jugador, ejecutamos tu excelente lógica de seguimiento
+	if inicializado:
+		var pos_jugador = objetivo.global_position
 
-	# 1. Eje X (Izquierda / Derecha)
-	if pos_jugador.x < punto_enfoque.x - margen_izquierdo:
-		punto_enfoque.x = pos_jugador.x + margen_izquierdo
-	elif pos_jugador.x > punto_enfoque.x + margen_derecho:
-		punto_enfoque.x = pos_jugador.x - margen_derecho
+		# Eje X (Izquierda / Derecha)
+		if pos_jugador.x < punto_enfoque.x - margen_izquierdo:
+			punto_enfoque.x = pos_jugador.x + margen_izquierdo
+		elif pos_jugador.x > punto_enfoque.x + margen_derecho:
+			punto_enfoque.x = pos_jugador.x - margen_derecho
 
-	# 2. Eje Z (Arriba / Abajo)
-	# Nota: En Godot 3D, el "Norte" (arriba en la pantalla) es -Z, y el "Sur" (abajo) es +Z.
-	if pos_jugador.z < punto_enfoque.z - margen_arriba:
-		punto_enfoque.z = pos_jugador.z + margen_arriba
-	elif pos_jugador.z > punto_enfoque.z + margen_abajo:
-		punto_enfoque.z = pos_jugador.z - margen_abajo
+		# Eje Z (Arriba / Abajo)
+		if pos_jugador.z < punto_enfoque.z - margen_arriba:
+			punto_enfoque.z = pos_jugador.z + margen_arriba
+		elif pos_jugador.z > punto_enfoque.z + margen_abajo:
+			punto_enfoque.z = pos_jugador.z - margen_abajo
 
-	# 3. Interpolar la cámara hacia el nuevo punto de enfoque
-	var posicion_final = punto_enfoque + offset
-	global_position = global_position.lerp(posicion_final, velocidad_suavizado * delta)
+		# Interpolar la cámara hacia el nuevo punto de enfoque
+		var posicion_final = punto_enfoque + offset
+		global_position = global_position.lerp(posicion_final, velocidad_suavizado * delta)

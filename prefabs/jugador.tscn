@@ -15,6 +15,17 @@ material = SubResource("StandardMaterial3D_3di4i")
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_3di4i"]
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_s4hg5"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:rotation")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:rotation_degrees")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+
 [node name="jugador" type="CharacterBody3D" unique_id=1185021812 groups=["jugador"]]
 collision_layer = 2
 collision_mask = 5
@@ -42,3 +53,6 @@ shape = SubResource("CapsuleShape3D_3di4i")
 [node name="PuntoDisparo" type="Marker3D" parent="." unique_id=570713313]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.020758629, 1.0207925, 1.3457129)
 gizmo_extents = 1.0
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=426196326]
+replication_config = SubResource("SceneReplicationConfig_s4hg5")

@@ -140,6 +140,7 @@ size = Vector2(1, 1)
 
 [node name="Mundo" type="Node3D" unique_id=745953541]
 script = ExtResource("1_75jji")
+escena_jugador = ExtResource("1_wqn8j")
 plano_arma_escena = ExtResource("2_541k4")
 caja_municion_escena = ExtResource("2_m7g0u")
 botiquin_escena = ExtResource("3_35q48")
@@ -167,13 +168,11 @@ shape = SubResource("ConcavePolygonShape3D_0vka0")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=897977415]
 transform = Transform3D(0.71017545, -0.6892503, -0.14347368, 0.6514401, 0.56606066, 0.5051748, -0.266977, -0.45222718, 0.8510074, 0.21735963, 11.092817, 0.7218034)
 
-[node name="jugador" parent="." unique_id=1185021812 instance=ExtResource("1_wqn8j")]
-
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1681848175 node_paths=PackedStringArray("objetivo")]
 transform = Transform3D(1, 0, 0, 0, 0.7547096, 0.6560591, 0, -0.656059, 0.7547097, 0, 10, 0)
 size = 25.0
 script = ExtResource("2_a2ps7")
-objetivo = NodePath("../jugador")
+objetivo = NodePath("")
 margen_izquierdo = 5.0
 margen_derecho = 4.0
 margen_arriba = 9.0
@@ -745,9 +744,14 @@ visible = false
 transform = Transform3D(50, 0, 0, 0, 50, 0, 0, 0, 50, 0, -2, 0)
 mesh = SubResource("PlaneMesh_f7ym0")
 
-[connection signal="pressed" from="InterfazUI/BotonRecargaIzquierdo" to="jugador" method="_on_boton_recargar_pressed"]
-[connection signal="pressed" from="InterfazUI/BotonRecargaDerecho" to="jugador" method="_on_boton_recargar_pressed"]
+[node name="ContenedorJugadores" type="Node3D" parent="." unique_id=1631117688]
+
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="." unique_id=1335389752]
+_spawnable_scenes = PackedStringArray("uid://x4o6yry24vgu", "uid://dkg3pc5sfq4a2")
+spawn_path = NodePath("../ContenedorJugadores")
+
 [connection signal="pressed" from="InterfazUI/BotonIniciar" to="." method="iniciar_oleada"]
+[connection signal="pressed" from="InterfazUI/BotonIniciar" to="." method="iniciar_oleada_en_red"]
 [connection signal="pressed" from="InterfazUI/BotonReparar" to="." method="ejecutar_reparacion_global"]
 [connection signal="pressed" from="InterfazUI/BotonReiniciar" to="." method="_on_boton_reiniciar_pressed"]
 [connection signal="pressed" from="InterfazUI/HudSuperiorIzquierdo/BotonNivel" to="." method="_on_boton_nivel_pressed"]

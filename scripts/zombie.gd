@@ -25,20 +25,34 @@ var esta_cargando_ataque: bool = false
 
 # --- ESTADOS INTERNOS ---
 var gravedad = ProjectSettings.get_setting("physics/3d/default_gravity")
-var jugador: Node3D
+var jugador_objetivo: Node3D = null # Cambiado para ser dinámico
 var puede_atacar: bool = true
 var esta_muerto: bool = false 
 var tiempo_vivo: float = 0.0
 
 # ==========================================================
-# 2. NODOS HIJOS (¡NUEVO: CEREBRO DE NAVEGACIÓN!)
+# 2. NODOS HIJOS Y AUTORIDAD
 # ==========================================================
 @onready var agente_nav: NavigationAgent3D = $NavigationAgent3D
 
 func _ready():
-	var jugadores_en_mapa = get_tree().get_nodes_in_group("jugador")
-	if not jugadores_en_mapa.is_empty():
-		jugador = jugadores_en_mapa[0]
+	# ¡VITAL! El ID 1 (Servidor) es el único dueño legítimo de todos los zombies
+	set_multiplayer_authority(1)
+
+# ¡NUEVA FUNCIÓN COOPERATIVA! El zombie escanea quién está más cerca
+func buscar_presa_mas_cercana() -> Node3D:
+	var jugadores = get_tree().get_nodes_in_group("jugador")
+	var presa_cercana = null
+	var distancia_minima = INF
+	
+	for jug in jugadores:
+		if is_instance_valid(jug) and jug.salud_actual > 0:
+			var dist = global_position.distance_to(jug.global_position)
+			if dist < distancia_minima:
+				distancia_minima = dist
+				presa_cercana = jug
+				
+	return presa_cercana
 
 # ==========================================================
 # 3. NACIMIENTO Y ESCALADO INFINITO (RPG)
@@ -48,7 +62,6 @@ func nacer(numero_oleada: int, costo: int, tipo: String = "basico"):
 	tipo_zombie = tipo 
 	rango_ataque = 1.2 * scale.x
 	
-	# Asignación de Arquetipos
 	match tipo:
 		"corredor":
 			salud_maxima_base = 25
@@ -65,56 +78,54 @@ func nacer(numero_oleada: int, costo: int, tipo: String = "basico"):
 			dano_ataque_base = 40
 			velocidad = 1.2
 			scale = Vector3(1.4, 1.4, 1.4)
-		"boss": # Mosca Tyrant
+		"boss": 
 			salud_maxima_base = 1200
 			dano_ataque_base = 70
 			velocidad = 3.0
 			scale = Vector3(2.5, 2.5, 2.5)
-		_: # Básico por defecto
+		_: 
 			salud_maxima_base = 40
 			dano_ataque_base = 15
 			velocidad = 1.8
 			scale = Vector3(1, 1, 1) 
 	
-	# --- CÁLCULO MATEMÁTICO DE ESCALADO ---
-	# $HP(W) = HP_{Base} \cdot 1.12^{(W-1)}$
 	var multiplicador_hp_ola = pow(1.12, numero_oleada - 1)
-	
 	var cantidad_jugadores = max(1, get_tree().get_nodes_in_group("jugador").size())
 	var multiplicador_coop = 1.0 + ((cantidad_jugadores - 1) * 0.60)
 	
 	salud_maxima = int(salud_maxima_base * multiplicador_hp_ola * multiplicador_coop)
 	salud_actual = salud_maxima
-	
-	# $Daño(W) = Daño_{Base} + (2 \cdot W)$
 	dano_ataque_actual = dano_ataque_base + (2 * numero_oleada)
 
 # ==========================================================
-# 4. INTELIGENCIA ARTIFICIAL Y FÍSICAS (Pathfinding)
+# 4. INTELIGENCIA ARTIFICIAL Y FÍSICAS
 # ==========================================================
 func _physics_process(delta):
-	if esta_muerto: return # Si está muerto, ignoramos todas las físicas
+	# ¡FILTRO DE RED! Solo la máquina del Host calcula dónde camina el zombie.
+	# Los clientes solo lo ven moverse gracias al MultiplayerSynchronizer.
+	if not multiplayer.is_server(): return
+	
+	if esta_muerto: return 
 	
 	tiempo_vivo += delta
 	
-	# Gravedad
 	if not is_on_floor():
 		velocity.y -= gravedad * delta 
 
-	# Congelamiento por casteo de habilidad
 	if esta_cargando_ataque:
 		detener_movimiento()
 		move_and_slide()
 		return 
 
-	# Lógica de Persecución (¡AHORA CON NAVMESH!)
-	if is_instance_valid(jugador) and jugador.salud_actual > 0:
-		var distancia_real = global_position.distance_to(jugador.global_position)
+	# Actualizamos la presa en tiempo real
+	jugador_objetivo = buscar_presa_mas_cercana()
+
+	if is_instance_valid(jugador_objetivo):
+		var distancia_real = global_position.distance_to(jugador_objetivo.global_position)
 		
 		if distancia_real > rango_ataque: 
-			# Alimentamos el cerebro con la posición del jugador
 			if agente_nav:
-				agente_nav.target_position = jugador.global_position
+				agente_nav.target_position = jugador_objetivo.global_position
 				var siguiente_paso = agente_nav.get_next_path_position()
 				
 				var direccion = global_position.direction_to(siguiente_paso)
@@ -124,26 +135,23 @@ func _physics_process(delta):
 				velocity.x = direccion.x * velocidad
 				velocity.z = direccion.z * velocidad
 				
-				# Rotación suave hacia el siguiente punto de la ruta
 				if velocity.length() > 0.1:
 					var pos_mirar = Vector3(siguiente_paso.x, global_position.y, siguiente_paso.z)
 					look_at(pos_mirar, Vector3.UP)
 		else:
-			# Alcance de ataque
 			detener_movimiento()
 			if puede_atacar:
 				if tipo_zombie == "explosivo": explotar()
-				else: atacar(jugador) 
+				else: atacar(jugador_objetivo) 
 	else:
 		detener_movimiento()
 
 	move_and_slide()
 	revisar_colisiones()
 		
-	# --- LÓGICA DEL JEFE (Limpia y sin duplicados) ---
-	if tipo_zombie == "boss" and is_instance_valid(jugador):
+	if tipo_zombie == "boss" and is_instance_valid(jugador_objetivo):
 		temporizador_habilidad -= delta
-		if temporizador_habilidad <= 0.0 and global_position.distance_to(jugador.global_position) <= 8.0:
+		if temporizador_habilidad <= 0.0 and global_position.distance_to(jugador_objetivo.global_position) <= 8.0:
 			iniciar_golpe_sismico() 
 			temporizador_habilidad = cooldown_habilidad
 
@@ -159,7 +167,6 @@ func atacar(objetivo):
 	if is_instance_valid(objetivo) and objetivo.has_method("recibir_dano"):
 		objetivo.recibir_dano(dano_ataque_actual)
 		
-	# Seguridad: Si el zombie muere mientras espera, no crashea
 	await get_tree().create_timer(cadencia_ataque).timeout
 	if is_instance_valid(self) and not esta_muerto:
 		puede_atacar = true
@@ -172,7 +179,6 @@ func revisar_colisiones():
 		if objeto_chocado and objeto_chocado.is_in_group("barricadas") and puede_atacar:
 			atacar(objeto_chocado)
 
-# --- JEFE: GOLPE SÍSMICO ---
 func iniciar_golpe_sismico():
 	esta_cargando_ataque = true
 	var tween = create_tween()
@@ -180,7 +186,6 @@ func iniciar_golpe_sismico():
 	
 	await get_tree().create_timer(1.0).timeout
 	
-	# Validación estricta post-espera
 	if not is_instance_valid(self) or esta_muerto: return
 		
 	ejecutar_golpe_sismico()
@@ -191,26 +196,29 @@ func ejecutar_golpe_sismico():
 	var radio_impacto = 6.0 
 	var dano_habilidad = int(dano_ataque_actual * 1.5) 
 	
-	if is_instance_valid(jugador) and global_position.distance_to(jugador.global_position) <= radio_impacto:
-		if jugador.has_method("recibir_dano"): jugador.recibir_dano(dano_habilidad)
+	if is_instance_valid(jugador_objetivo) and global_position.distance_to(jugador_objetivo.global_position) <= radio_impacto:
+		if jugador_objetivo.has_method("recibir_dano"): jugador_objetivo.recibir_dano(dano_habilidad)
 				
 	var barricadas = get_tree().get_nodes_in_group("barricadas")
 	for defensa in barricadas:
 		if is_instance_valid(defensa) and global_position.distance_to(defensa.global_position) <= radio_impacto:
 			if defensa.has_method("recibir_dano"): defensa.recibir_dano(dano_habilidad)
 
-# --- ZOMBIE EXPLOSIVO ---
 func explotar():
 	puede_atacar = false 
-	if is_instance_valid(jugador) and jugador.has_method("recibir_dano"):
-		jugador.recibir_dano(dano_ataque_actual)
+	if is_instance_valid(jugador_objetivo) and jugador_objetivo.has_method("recibir_dano"):
+		jugador_objetivo.recibir_dano(dano_ataque_actual)
 	
-	recibir_dano(salud_actual) # Autodestrucción usando el flujo normal de muerte
+	recibir_dano(salud_actual)
 
 # ==========================================================
-# 6. SISTEMA DE DAÑO Y MUERTE
+# 6. SISTEMA DE DAÑO Y MUERTE (BLINDADO EN RED)
 # ==========================================================
 func recibir_dano(cantidad: int):
+	# ¡FILTRO DE RED CRÍTICO! Las balas existen en ambas pantallas, pero 
+	# solo el Servidor descuenta la vida, registra la muerte y suelta el oro.
+	if not multiplayer.is_server(): return 
+	
 	if esta_muerto: return 
 		
 	salud_actual -= cantidad
@@ -223,4 +231,6 @@ func recibir_dano(cantidad: int):
 			if mundo.has_method("zombie_eliminado"): mundo.zombie_eliminado()
 			if mundo.has_method("spawn_loot"): mundo.spawn_loot(global_position, tipo_zombie) 
 			
+		# Al borrarse en el Servidor, el MultiplayerSpawner de Godot 
+		# lo borra automáticamente en los clientes.
 		queue_free()

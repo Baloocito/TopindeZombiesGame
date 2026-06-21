@@ -1,24 +1,25 @@
 extends CanvasLayer
 
-var en_partida_online: bool = false 
-
-# Referencia a nuestro nuevo cartel de próximamente
 @onready var panel_opciones = $PanelOpciones 
 
 func _ready():
 	visible = false
 	if panel_opciones:
-		panel_opciones.visible = false # Nos aseguramos de que arranque apagado
+		panel_opciones.visible = false 
 
 func alternar_pausa():
 	visible = !visible
 	
+	# Lógica inteligente: 
+	# Si es Online, NO detenemos el tiempo del servidor (get_tree().paused = false)
+	# Si es un juego local solitario, pausamos todo.
+	var es_online = multiplayer.has_multiplayer_peer()
+	
 	if visible:
-		if not en_partida_online:
+		if not es_online:
 			get_tree().paused = true 
 	else:
 		get_tree().paused = false 
-		# Si quitamos la pausa, escondemos las opciones por si quedaron abiertas
 		if panel_opciones: 
 			panel_opciones.visible = false 
 
@@ -28,19 +29,21 @@ func _on_boton_reanudar_pressed():
 	alternar_pausa()
 
 func _on_boton_opciones_pressed():
-	# En lugar de solo imprimir, mostramos el cartel
 	if panel_opciones:
 		panel_opciones.visible = true 
 
 func _on_boton_cerrar_opciones_pressed():
-	# El botón de "Cerrar" dentro del cartel
 	if panel_opciones:
 		panel_opciones.visible = false
 
 func _on_boton_abandonar_pressed():
-	get_tree().paused = false 
+	get_tree().paused = false
+	
+	# ¡NUEVO! Limpiamos la conexión antes de irnos
+	if multiplayer.multiplayer_peer:
+		multiplayer.multiplayer_peer.close()
+		
 	get_tree().change_scene_to_file("res://scenes/menu_principal.tscn")
 
-# Si este es el botón táctil del HUD de tu juego, debe llamar a alternar_pausa()
 func _on_boton_pausa_tactil_pressed() -> void:
 	alternar_pausa()

@@ -6,6 +6,14 @@
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_kewk0"]
 radius = 0.6
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_vlph1"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:rotation")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+
 [node name="zombie" type="CharacterBody3D" unique_id=1060371809 groups=["enemigos"]]
 collision_layer = 4
 collision_mask = 7
@@ -21,3 +29,6 @@ shape = SubResource("CylinderShape3D_kewk0")
 transform = Transform3D(-2, 0, -1.7484555e-07, 0, 2, 0, 1.7484555e-07, 0, -2, 0, 0, 0)
 
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=442363551]
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=621635790]
+replication_config = SubResource("SceneReplicationConfig_vlph1")
