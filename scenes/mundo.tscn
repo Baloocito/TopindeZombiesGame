@@ -180,15 +180,19 @@ margen_abajo = -10.0
 [node name="InterfazUI" type="CanvasLayer" parent="." unique_id=1191662003]
 
 [node name="BotonRecargaIzquierdo" type="Button" parent="InterfazUI" unique_id=1106631392]
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 0
+anchor_top = 1
+anchor_right = 0
+anchor_bottom = 1
+offset_left = 26
+offset_top = -290
+offset_right = 135
+offset_bottom = -195
+grow_horizontal = 1
+grow_vertical = 0
 custom_minimum_size = Vector2(100, 60)
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -550.0
-offset_top = 358.0
-offset_right = -441.0
-offset_bottom = 453.0
-grow_horizontal = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 19
 theme_override_styles/normal = SubResource("StyleBoxTexture_ws26n")
@@ -196,15 +200,19 @@ action_mode = 0
 script = ExtResource("12_w7nu4")
 
 [node name="BotonRecargaDerecho" type="Button" parent="InterfazUI" unique_id=585264463]
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 1
+anchor_top = 1
+anchor_right = 1
+anchor_bottom = 1
+offset_left = -226
+offset_top = -279
+offset_right = -117
+offset_bottom = -184
+grow_horizontal = 0
+grow_vertical = 0
 custom_minimum_size = Vector2(100, 60)
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = 350.0
-offset_top = 369.0
-offset_right = 459.0
-offset_bottom = 464.0
-grow_horizontal = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 19
 theme_override_styles/normal = SubResource("StyleBoxTexture_ws26n")
@@ -309,38 +317,70 @@ texture = ExtResource("11_l7i8s")
 expand_mode = 1
 
 [node name="BotonIniciar" type="Button" parent="InterfazUI" unique_id=2106588159]
-offset_left = 268.0
-offset_top = 533.0
-offset_right = 487.0
-offset_bottom = 640.0
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 0
+anchor_top = 1
+anchor_right = 0
+anchor_bottom = 1
+offset_left = 268
+offset_top = -115
+offset_right = 487
+offset_bottom = -8
+grow_horizontal = 1
+grow_vertical = 0
 theme_override_styles/normal = SubResource("StyleBoxTexture_vnytd")
 script = ExtResource("12_w7nu4")
 
 [node name="BotonReparar" type="Button" parent="InterfazUI" unique_id=1540342012]
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0
+anchor_right = 0.5
+anchor_bottom = 0
+offset_left = -129
+offset_top = 42
+offset_right = 23
+offset_bottom = 86
+grow_horizontal = 2
+grow_vertical = 1
 visible = false
 self_modulate = Color(0.6356338, 0.6356338, 0.6356338, 1)
-offset_left = 447.0
-offset_top = 42.0
-offset_right = 599.0
-offset_bottom = 86.0
 text = "Reparar todo!"
 
 [node name="TextoGameOver" type="Label" parent="InterfazUI" unique_id=503818781]
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -369
+offset_top = -111
+offset_right = 330
+offset_bottom = 26
+grow_horizontal = 2
+grow_vertical = 2
 visible = false
-offset_left = 207.0
-offset_top = 213.0
-offset_right = 906.0
-offset_bottom = 350.0
 theme_override_colors/font_color = Color(0.79607844, 0, 0, 1)
 theme_override_font_sizes/font_size = 100
 text = "¡HAS MUERTO!"
 
 [node name="BotonReiniciar" type="Button" parent="InterfazUI" unique_id=538405564]
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -119
+offset_top = 51
+offset_right = 106
+offset_bottom = 120
+grow_horizontal = 2
+grow_vertical = 2
 visible = false
-offset_left = 457.0
-offset_top = 375.0
-offset_right = 682.0
-offset_bottom = 444.0
 theme_override_font_sizes/font_size = 30
 text = "REINTENTAR!"
 
@@ -644,12 +684,20 @@ scale = Vector2(0.09191894, 0.0942383)
 texture = ExtResource("20_np3xf")
 
 [node name="PanelLateral" type="Panel" parent="InterfazUI" unique_id=30432391]
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 1
+anchor_top = 0
+anchor_right = 1
+anchor_bottom = 1
+offset_left = -410
+offset_top = 0
+offset_right = 0
+offset_bottom = 0
+grow_horizontal = 0
+grow_vertical = 1
 visible = false
 self_modulate = Color(0.72043425, 0.72043425, 0.72043425, 1)
-offset_left = 743.0
-offset_top = -1.0
-offset_right = 1153.0
-offset_bottom = 655.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxTexture_l7i8s")
 

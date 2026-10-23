@@ -7,17 +7,33 @@ process_mode = 3
 script = ExtResource("1_jhjql")
 
 [node name="ColorRect" type="ColorRect" parent="." unique_id=631594726]
-offset_left = -19.0
-offset_top = -8.0
-offset_right = 1158.0
-offset_bottom = 671.0
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 0
+anchor_top = 0
+anchor_right = 1
+anchor_bottom = 1
+offset_left = 0
+offset_top = 0
+offset_right = 0
+offset_bottom = 0
+grow_horizontal = 1
+grow_vertical = 1
 color = Color(1, 1, 1, 0.47843137)
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=281534126]
-offset_left = 513.0
-offset_top = 268.0
-offset_right = 634.0
-offset_bottom = 402.0
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -63
+offset_top = -56
+offset_right = 58
+offset_bottom = 78
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="BotonReanudar" type="Button" parent="VBoxContainer" unique_id=30971520]
 layout_mode = 2
@@ -32,10 +48,18 @@ layout_mode = 2
 text = "Abandonar"
 
 [node name="PanelOpciones" type="Panel" parent="." unique_id=1485074534]
-offset_left = 199.0
-offset_top = 89.0
-offset_right = 951.0
-offset_bottom = 539.0
+layout_mode = 3
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -377
+offset_top = -235
+offset_right = 375
+offset_bottom = 215
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="Label" type="Label" parent="PanelOpciones" unique_id=791336759]
 layout_mode = 0

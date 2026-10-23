@@ -22,9 +22,10 @@ EstadoPartida="*uid://4o0ke8wvbq5h"
 
 [display]
 
-window/size/viewport_width=1200
-window/size/viewport_height=900
+window/size/viewport_width=1152
+window/size/viewport_height=648
 window/stretch/mode="viewport"
+window/stretch/aspect="expand"
 window/handheld/orientation=4
 
 [global]
