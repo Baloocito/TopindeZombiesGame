@@ -71,10 +71,8 @@ func informar_id_logico(id_logico: int):
 # ==========================================================
 # NUEVO (Fase 1.D: Ganchos de ciclo de vida de la app)
 # ==========================================================
-# Mismo puerto que lobby.gd (PORT). Si alguna vez cambian el puerto ahí,
-# hay que cambiarlo acá también -- no hay forma limpia de compartir una
-# constante entre un Autoload y un Control sin un tercer archivo, y no vale
-# la pena la complejidad extra por un solo número.
+# Puerto único de la red. lobby.gd lo lee desde aquí (EstadoPartida.PUERTO_RED),
+# así que si hay que cambiarlo, se cambia SOLO en este lugar.
 const PUERTO_RED = 7000
 
 # lobby.gd nos avisa a qué IP se conectó por última vez, para poder

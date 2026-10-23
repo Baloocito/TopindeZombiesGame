@@ -1,7 +1,6 @@
 extends Control
 
 # Puerto de red
-const PORT = 7000
 const MAX_CLIENTS = 4  # tope duro de conexiones ENet (host + hasta 3 más)
 
 var peer = ENetMultiplayerPeer.new()
@@ -21,7 +20,7 @@ var jugadores_conectados = {}
 # "Iniciar Partida" queda oculto hasta llenar ese número. Esto elimina por
 # completo el caso de "alguien entra después de que la horda ya arrancó",
 # que era la fuente de casi todos los bugs de sincronización tardía.
-var cantidad_deseada: int = 2
+var cantidad_deseada: int = 1  # 1 = jugar solo (el host sin invitados)
 var contrasena_sala: String = ""
 var soy_host: bool = false
 var sala_bloqueada: bool = false  # true apenas arranca la partida
@@ -40,6 +39,7 @@ var spin_cantidad: SpinBox
 var input_contrasena_crear: LineEdit
 var input_contrasena_unirse: LineEdit
 var label_estado_sala: Label
+var boton_volver: Button
 
 func _ready():
 	boton_iniciar.hide()
@@ -59,10 +59,12 @@ func _crear_controles_nuevos():
 	var label_cantidad = Label.new()
 	label_cantidad.text = "Jugadores en la sala: "
 	spin_cantidad = SpinBox.new()
-	spin_cantidad.min_value = 2
+	spin_cantidad.min_value = 1
 	spin_cantidad.max_value = MAX_CLIENTS
 	spin_cantidad.value = cantidad_deseada
-	spin_cantidad.value_changed.connect(func(v): cantidad_deseada = int(v))
+	spin_cantidad.value_changed.connect(func(v):
+		cantidad_deseada = int(v)
+		_actualizar_texto_boton_host())
 	fila_cantidad.add_child(label_cantidad)
 	fila_cantidad.add_child(spin_cantidad)
 	vbox.add_child(fila_cantidad)
@@ -87,11 +89,35 @@ func _crear_controles_nuevos():
 	label_estado_sala.hide()
 	vbox.add_child(label_estado_sala)
 
+	# --- Salida siempre disponible (antes no había forma de volver al menú) ---
+	boton_volver = Button.new()
+	boton_volver.text = "Volver al menú"
+	boton_volver.pressed.connect(_volver_al_menu)
+	vbox.add_child(boton_volver)
+
+	_actualizar_texto_boton_host()
+
+func _actualizar_texto_boton_host():
+	btn_host.text = "Jugar Solo" if cantidad_deseada <= 1 else "Crear Partida (Host)"
+
+# Cierra la conexión (si hay) y vuelve al menú principal. Sirve tanto antes de
+# crear/unirse a una sala como estando ya dentro de una.
+func _volver_al_menu():
+	if multiplayer.multiplayer_peer != null:
+		multiplayer.multiplayer_peer.close()
+	multiplayer.multiplayer_peer = null
+	EstadoPartida.ids_iniciales = []
+	get_tree().change_scene_to_file("res://scenes/menu_principal.tscn")
+
+func _unhandled_input(event):
+	if event.is_action_pressed("ui_cancel"):
+		_volver_al_menu()
+
 # ==========================================
 # BOTONES DE CONEXIÓN
 # ==========================================
 func _on_btn_host_pressed():
-	var error = peer.create_server(PORT, MAX_CLIENTS)
+	var error = peer.create_server(EstadoPartida.PUERTO_RED, MAX_CLIENTS)
 	if error != OK:
 		print("Error al crear el Host: ", error)
 		return
@@ -108,12 +134,16 @@ func _on_btn_host_pressed():
 
 	esconder_menu_conexion()
 
+	# Una sala de 1 jugador es "jugar solo": no hay nadie a quien esperar.
+	if cantidad_deseada <= 1:
+		_on_boton_iniciar_juego_pressed()
+
 func _on_btn_unirse_pressed():
 	var ip = input_ip.text
 	if ip == "":
 		ip = "127.0.0.1"
 
-	var error = peer.create_client(ip, PORT)
+	var error = peer.create_client(ip, EstadoPartida.PUERTO_RED)
 	if error != OK:
 		print("Error al configurar el cliente: ", error)
 		return

@@ -14,6 +14,15 @@ extends TextureRect
 @export var radio_palanca: float = 40.0
 @export var zona_muerta: float = 10.0
 
+@export_category("Disparo (solo joystick derecho)")
+# Fracción del radio a partir de la cual se empieza a disparar. Debe coincidir
+# con el borde del AnilloFuego dibujado (ej. anillo de 60 px con radio_base 100 = 0.6).
+@export var umbral_disparo: float = 0.6
+# Histéresis: una vez disparando, solo se deja de disparar al bajar de este valor.
+# Evita que el tiro "tartamudee" cuando el pulgar tiembla justo en el borde del anillo.
+@export var umbral_soltar: float = 0.5
+const ACCION_DISPARO := "disparar_tactil"
+
 enum LadoPantalla { IZQUIERDA, DERECHA }
 @export_category("Configuración Flotante")
 @export var lado_asignado: LadoPantalla = LadoPantalla.IZQUIERDA
@@ -23,6 +32,7 @@ enum LadoPantalla { IZQUIERDA, DERECHA }
 var vector_input := Vector2.ZERO
 var dedo_indice: int = -1
 var centro_real: Vector2
+var disparando: bool = false
 
 func _ready():
 	centro_real = Vector2(radio_base, radio_base)
@@ -30,7 +40,21 @@ func _ready():
 	
 	visible = false
 	modulate.a = 0.6 
+	if not InputMap.has_action(ACCION_DISPARO):
+		InputMap.add_action(ACCION_DISPARO)
 	call_deferred("resetear_joystick")
+
+# Si la app pierde el foco, se pausa el árbol o se cambia de escena con el dedo
+# puesto, Godot nunca manda el "soltar": el personaje quedaría caminando o
+# disparando solo. Soltamos todo por seguridad.
+func _notification(what):
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_PAUSED:
+		if is_node_ready():
+			resetear_joystick()
+
+func _exit_tree():
+	if is_node_ready():
+		resetear_joystick()
 
 # ==========================================================
 # 2. EL CEREBRO FLOTANTE
@@ -54,6 +78,12 @@ func _unhandled_input(event):
 		toque_id = event.index
 		pos_toque = event.position
 	elif event is InputEventMouseButton or event is InputEventMouseMotion:
+		# En un celular cada toque genera además un "ratón fantasma" con id 0,
+		# que podía secuestrar o duplicar el dedo. Con pantalla táctil real
+		# solo escuchamos los toques. (En PC el ratón ya llega como toque
+		# gracias a emulate_touch_from_mouse.)
+		if DisplayServer.is_touchscreen_available():
+			return
 		toque_id = 0
 		pos_toque = event.position
 	else:
@@ -93,6 +123,16 @@ func actualizar_joystick(pos_global_dedo: Vector2):
 	
 	if direccion.length() > radio_base:
 		direccion = direccion.normalized() * radio_base
+
+	# Disparo por zonas: el centro solo apunta; pasar el anillo rojo dispara.
+	if lado_asignado == LadoPantalla.DERECHA:
+		var ratio = direccion.length() / radio_base
+		if ratio >= umbral_disparo:
+			disparando = true
+		elif ratio < umbral_soltar:
+			disparando = false
+		palanca.modulate = Color(1, 0.2, 0.2) if disparando else Color.WHITE
+		_aplicar_disparo()
 		
 	palanca.position = centro_real + direccion - Vector2(radio_palanca, radio_palanca)
 	
@@ -100,17 +140,8 @@ func actualizar_joystick(pos_global_dedo: Vector2):
 	if direccion.length() > zona_muerta:
 		var fuerza = (direccion.length() - zona_muerta) / (radio_base - zona_muerta)
 		vector_input = direccion.normalized() * fuerza
-		
-		# --- EFECTO GATILLO VISUAL ---
-		if lado_asignado == LadoPantalla.DERECHA:
-			if vector_input.length() > 0.6:
-				palanca.modulate = Color(1, 0.2, 0.2) 
-			else:
-				palanca.modulate = Color.WHITE 
 	else:
-		vector_input = Vector2.ZERO 
-		if lado_asignado == LadoPantalla.DERECHA: 
-			palanca.modulate = Color.WHITE
+		vector_input = Vector2.ZERO
 		
 	enviar_input_al_juego()
 
@@ -118,8 +149,17 @@ func resetear_joystick():
 	vector_input = Vector2.ZERO
 	dedo_indice = -1
 	visible = false 
+	disparando = false
 	palanca.modulate = Color.WHITE
+	_aplicar_disparo()
 	enviar_input_al_juego()
+
+func _aplicar_disparo():
+	if lado_asignado != LadoPantalla.DERECHA: return
+	if disparando:
+		Input.action_press(ACCION_DISPARO)
+	else:
+		Input.action_release(ACCION_DISPARO)
 
 # ==========================================================
 # 4. INYECCIÓN DE CONTROLES AL MOTOR

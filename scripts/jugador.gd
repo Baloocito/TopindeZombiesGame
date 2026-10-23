@@ -65,6 +65,10 @@ var tween_nivel: Tween
 @export var bala_escena: PackedScene
 @onready var punto_disparo = $PuntoDisparo
 const PISTOLA_INICIAL = preload("res://materials/pistola.tres")
+# Máximo error (radianes, ~20°) entre hacia dónde mira el cuerpo y hacia dónde
+# apunta el joystick para poder disparar. Evita gastar balas en la dirección vieja
+# mientras el personaje todavía está girando.
+const ANGULO_MAX_DISPARO := 0.35
 
 var armas_inventario: Array[ArmaData] = []
 var armas_equipadas: Array[ArmaData] = [null, null, null]
@@ -162,7 +166,12 @@ func _physics_process(delta: float) -> void:
 			var angulo_objetivo = atan2(aim_dir.x, aim_dir.y)
 			rotation.y = lerp_angle(rotation.y, angulo_objetivo, 15.0 * delta)
 
-			if aim_dir.length() > 0.6 and can_fire_fase:
+			var alineado = absf(angle_difference(rotation.y, angulo_objetivo)) < ANGULO_MAX_DISPARO
+			# Táctil: dispara quien empuja el joystick más allá del anillo rojo
+			# (acción "disparar_tactil"). Mando/otros: como antes, stick > 0.6.
+			var quiere_disparar = (InputMap.has_action("disparar_tactil") and Input.is_action_pressed("disparar_tactil")) \
+				or (not DisplayServer.is_touchscreen_available() and aim_dir.length() > 0.6)
+			if quiere_disparar and alineado and can_fire_fase:
 				intentar_disparar()
 
 		# --- NUEVO: reanimación por proximidad ---
