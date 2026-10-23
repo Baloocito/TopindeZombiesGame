@@ -9,7 +9,30 @@ var experiencia_actual: int = 0
 var puntos_mejora: int = 0
 
 var stat_salud_maxima: int = 100
-var salud_actual: int
+# --- FIX (revisión de código) ---
+# Antes esta variable no tenía valor por defecto y solo se asignaba dentro
+# del bloque "if is_multiplayer_authority()" en _ready(). Eso significa que
+# la copia que el SERVIDOR tiene de un jugador INVITADO (donde el servidor
+# no es la autoridad de ese nodo) nunca ejecutaba esa línea, y salud_actual
+# se quedaba en 0 para siempre en esa copia. zombie.gd filtra objetivos con
+# "jug.salud_actual > 0", así que el servidor descartaba al invitado como
+# presa válida: los zombies nunca lo detectaban ni lo perseguían. Con un
+# valor inicial > 0 aquí, y reforzado en _ready() (ver abajo, ya sin el
+# candado de autoridad), el servidor siempre ve una salud coherente.
+var salud_actual: int = 100
+
+# --- NUEVO: SISTEMA DE "DERRIBADO" / REANIMACIÓN ---
+# En vez de Game Over individual al llegar a 0 de vida, el jugador queda
+# "derribado" (fuera de combate, no puede moverse ni disparar) hasta que:
+#  a) un compañero vivo lo reanima acercándose, o
+#  b) la oleada termina con al menos un jugador en pie (revive a todos).
+# Solo si TODOS los jugadores quedan derribados a la vez se dispara el
+# Game Over real (ver mundo.gd: revisar_todos_caidos()).
+var esta_caido: bool = false
+var temporizador_reanimacion: float = 0.0
+const RADIO_REANIMACION: float = 2.0
+const TIEMPO_REANIMACION: float = 3.0
+
 var stat_agilidad: float = 4.0
 var stat_destreza: float = 1.0       # Multiplicador de velocidad de recarga
 var stat_ingenieria: float = 1.0     # Multiplicador de HP para estructuras/torretas
@@ -41,19 +64,19 @@ var tween_nivel: Tween
 @export_category("Ajustes de Combate")
 @export var bala_escena: PackedScene
 @onready var punto_disparo = $PuntoDisparo
-const PISTOLA_INICIAL = preload("res://materials/pistola.tres") 
+const PISTOLA_INICIAL = preload("res://materials/pistola.tres")
 
-var armas_inventario: Array[ArmaData] = [] 
-var armas_equipadas: Array[ArmaData] = [null, null, null] 
-var cargadores_equipados: Array[int] = [0, 0, 0] 
+var armas_inventario: Array[ArmaData] = []
+var armas_equipadas: Array[ArmaData] = [null, null, null]
+var cargadores_equipados: Array[int] = [0, 0, 0]
 
-var arma_actual: ArmaData 
-var slot_actual: int = 0 
+var arma_actual: ArmaData
+var slot_actual: int = 0
 var balas_en_cargador: int = 0
 var esta_recargando: bool = false
 var temporizador_disparo: float = 0.0
 
-var can_fire_fase: bool = false 
+var can_fire_fase: bool = false
 
 var municion_reserva: Dictionary = {
 	"Ligera": 90,
@@ -67,23 +90,40 @@ var municion_reserva: Dictionary = {
 func _enter_tree():
 	# ¡Aquí es donde Godot nos pide que definamos la autoridad!
 	set_multiplayer_authority(name.to_int())
-	
-func _ready():	
+
+func _ready():
+	# --- FIX (revisión de código) ---
+	# Esta línea corre SIEMPRE, en TODAS las copias del nodo (la del dueño
+	# real y las réplicas no-autoritativas que ven el servidor y los demás
+	# peers), no solo detrás del candado de autoridad. Es inofensivo pegarle
+	# el mismo valor a una copia que no es tuya, y es justo lo que necesita
+	# el servidor para poder evaluar correctamente "salud_actual > 0" sobre
+	# CUALQUIER jugador al elegir presa en buscar_presa_mas_cercana().
+	salud_actual = stat_salud_maxima
+
 	# Si tú eres el dueño absoluto de este clon específico:
 	if is_multiplayer_authority():
-		salud_actual = stat_salud_maxima
 		actualizar_ui_vida()
 		actualizar_ui_xp()
-			
-		armas_inventario.append(PISTOLA_INICIAL)
-		equipar_en_slot(PISTOLA_INICIAL, 0)
+
+		# --- FIX (revisión de código) ---
+		# preload()/load() cachean el Resource: sin .duplicate(), TODOS los
+		# jugadores terminaban compartiendo el MISMO objeto ArmaData para la
+		# pistola/escopeta/smg iniciales. Como "Forjar Mejora Aleatoria" en
+		# mundo.gd modifica los stats del arma directamente (arma.dano += ...),
+		# mejorar tu pistola inicial mejoraba la de TODOS los jugadores, y el
+		# cambio persistía incluso reiniciando la partida (solo se resetea
+		# cerrando el proceso del juego del todo).
+		var pistola_inicial: ArmaData = PISTOLA_INICIAL.duplicate()
+		armas_inventario.append(pistola_inicial)
+		equipar_en_slot(pistola_inicial, 0)
 		cambiar_arma(0)
-		
+
 		var escopeta = load("res://materials/escopeta.tres")
 		var smg = load("res://materials/smg.tres")
-		if escopeta: armas_inventario.append(escopeta)
-		if smg: armas_inventario.append(smg)
-		
+		if escopeta: armas_inventario.append(escopeta.duplicate())
+		if smg: armas_inventario.append(smg.duplicate())
+
 
 func set_can_fire(valor: bool) -> void:
 	can_fire_fase = valor
@@ -97,9 +137,16 @@ func _physics_process(delta: float) -> void:
 
 	# ¡AQUÍ ESTÁ LA MAGIA! Ignoramos los joysticks si no somos el dueño
 	if is_multiplayer_authority():
+		# --- NUEVO: si estoy derribado, no muevo ni disparo ---
+		if esta_caido:
+			velocity.x = move_toward(velocity.x, 0, stat_agilidad)
+			velocity.z = move_toward(velocity.z, 0, stat_agilidad)
+			move_and_slide()
+			return
+
 		var input_dir := Input.get_vector("mover_izq", "mover_der", "mover_arriba", "mover_abajo")
 		var direction := Vector3(input_dir.x, 0, input_dir.y).normalized()
-		
+
 		if direction:
 			velocity.x = direction.x * stat_agilidad
 			velocity.z = direction.z * stat_agilidad
@@ -110,14 +157,26 @@ func _physics_process(delta: float) -> void:
 		temporizador_disparo += delta
 
 		var aim_dir := Input.get_vector("apuntar_izq", "apuntar_der", "apuntar_arriba", "apuntar_abajo")
-		
+
 		if aim_dir.length() > 0.1:
-			var angulo_objetivo = atan2(aim_dir.x, aim_dir.y)        
+			var angulo_objetivo = atan2(aim_dir.x, aim_dir.y)
 			rotation.y = lerp_angle(rotation.y, angulo_objetivo, 15.0 * delta)
-			
+
 			if aim_dir.length() > 0.6 and can_fire_fase:
 				intentar_disparar()
-				
+
+		# --- NUEVO: reanimación por proximidad ---
+		# Si estoy vivo y hay un compañero derribado cerca, tras quedarme
+		# TIEMPO_REANIMACION segundos junto a él, pido al servidor que lo revida.
+		var companero_caido = buscar_companero_caido_cercano()
+		if companero_caido:
+			temporizador_reanimacion += delta
+			if temporizador_reanimacion >= TIEMPO_REANIMACION:
+				temporizador_reanimacion = 0.0
+				solicitar_revivir_companero.rpc_id(1, companero_caido.name)
+		else:
+			temporizador_reanimacion = 0.0
+
 	move_and_slide()
 
 # ==========================================================
@@ -126,20 +185,20 @@ func _physics_process(delta: float) -> void:
 func equipar_en_slot(nueva_arma: ArmaData, slot: int):
 	if slot < 0 or slot > 2: return
 	armas_equipadas[slot] = nueva_arma
-	cargadores_equipados[slot] = nueva_arma.tamano_cargador 
+	cargadores_equipados[slot] = nueva_arma.tamano_cargador
 	actualizar_ui_municion()
 
 func cambiar_arma(slot: int):
-	if slot < 0 or slot > 2 or armas_equipadas[slot] == null: return 
-	
+	if slot < 0 or slot > 2 or armas_equipadas[slot] == null: return
+
 	if arma_actual != null:
 		cargadores_equipados[slot_actual] = balas_en_cargador
-		
+
 	slot_actual = slot
 	arma_actual = armas_equipadas[slot]
 	balas_en_cargador = cargadores_equipados[slot]
-	
-	esta_recargando = false 
+
+	esta_recargando = false
 	temporizador_disparo = 1.0
 	actualizar_ui_municion()
 
@@ -158,7 +217,7 @@ func ciclo_arma_rapido():
 
 func intentar_disparar():
 	if not arma_actual or esta_recargando: return
-		
+
 	var tiempo_entre_balas = 1.0 / arma_actual.cadencia
 	if temporizador_disparo >= tiempo_entre_balas:
 		if balas_en_cargador > 0:
@@ -166,11 +225,11 @@ func intentar_disparar():
 			temporizador_disparo = 0.0
 			balas_en_cargador -= 1
 			actualizar_ui_municion()
-			
+
 			# 2. Lógica de RED: Le gritamos a todos que generen la bala, pasándole los datos exactos
 			ejecutar_disparo_en_red.rpc(arma_actual.dano, arma_actual.dispersion, arma_actual.balas_por_disparo)
 		else:
-			recargar() 
+			recargar()
 
 # ¡MAGIA RPC! Recibimos los datos del arma directamente en los parámetros
 @rpc("call_local", "any_peer", "reliable")
@@ -179,32 +238,42 @@ func ejecutar_disparo_en_red(dano_arma: int, dispersion_arma: float, cantidad_ba
 
 	# Calculamos la dispersión usando el dato que llegó por la red
 	var dispersion_rad = deg_to_rad(dispersion_arma) if dispersion_arma > 0.0 else 0.0
-	
+
 	for i in range(cantidad_balas):
 		var nueva_bala = bala_escena.instantiate()
 		get_tree().current_scene.add_child(nueva_bala)
 		nueva_bala.global_transform = punto_disparo.global_transform
-		
+
 		if dispersion_rad > 0.0:
 			var angulo_desvio = randf_range(-dispersion_rad, dispersion_rad)
 			nueva_bala.rotate_y(angulo_desvio)
-		
+
 		# Le inyectamos el daño que llegó por la red
 		if "dano" in nueva_bala:
 			nueva_bala.dano = dano_arma
 
+		# --- FIX (revision de codigo) ---
+		# ejecutar_disparo_en_red corre en TODOS los peers (broadcast con
+		# call_local), asi que cada uno instancia su propia bala local.
+		# Marcamos "es_bala_propia" solo en la copia que ve el propio tirador
+		# (is_multiplayer_authority() de ESTE jugador, en ESTE peer). Asi,
+		# solo esa bala reporta el impacto al servidor -- evitamos que el
+		# mismo disparo cuente dano varias veces (una por cada pantalla).
+		if "es_bala_propia" in nueva_bala:
+			nueva_bala.es_bala_propia = is_multiplayer_authority()
+
 func recargar():
 	if not arma_actual or esta_recargando or balas_en_cargador == arma_actual.tamano_cargador: return
-		
+
 	var tipo = arma_actual.tipo_municion
 	if municion_reserva[tipo] <= 0: return
-		
+
 	esta_recargando = true
-	actualizar_ui_municion() 
-	
+	actualizar_ui_municion()
+
 	var tiempo_real = arma_actual.tiempo_recarga / stat_destreza
 	await get_tree().create_timer(tiempo_real).timeout
-	
+
 	var balas_necesarias = arma_actual.tamano_cargador - balas_en_cargador
 	if municion_reserva[tipo] >= balas_necesarias:
 		balas_en_cargador += balas_necesarias
@@ -212,7 +281,7 @@ func recargar():
 	else:
 		balas_en_cargador += municion_reserva[tipo]
 		municion_reserva[tipo] = 0
-		
+
 	esta_recargando = false
 	actualizar_ui_municion()
 
@@ -229,16 +298,20 @@ func recoger_municion(cantidad: int, tipo: String):
 # ==========================================================
 func actualizar_ui_vida():
 	if not is_multiplayer_authority(): return # El clon no debe tocar mi pantalla
-	
+
 	if lbl_salud_num and barra_salud:
-		lbl_salud_num.text = "%s / %s" % [salud_actual, stat_salud_maxima]
+		if esta_caido:
+			lbl_salud_num.text = "DERRIBADO"
+		else:
+			lbl_salud_num.text = "%s / %s" % [salud_actual, stat_salud_maxima]
 		barra_salud.max_value = stat_salud_maxima
+		var valor_mostrado = 0 if esta_caido else salud_actual
 		var tween = create_tween()
-		tween.tween_property(barra_salud, "value", float(salud_actual), 0.2).set_trans(Tween.TRANS_SINE)
+		tween.tween_property(barra_salud, "value", float(valor_mostrado), 0.2).set_trans(Tween.TRANS_SINE)
 
 func actualizar_ui_xp():
 	if not is_multiplayer_authority(): return
-	
+
 	if lbl_nivel and barra_xp:
 		var xp_necesaria = 500 + (nivel * 200)
 		lbl_nivel.text = "NIVEL %s" % nivel
@@ -248,29 +321,29 @@ func actualizar_ui_xp():
 
 func actualizar_ui_municion():
 	if not is_multiplayer_authority(): return
-	
+
 	for i in range(3):
 		if i >= slots_ui.size(): break
 		var slot_nodo = slots_ui[i]
 		if not is_instance_valid(slot_nodo): continue
-		
+
 		var lbl_nombre = slot_nodo.find_child("LblNombre*", true, false)
 		var lbl_balas = slot_nodo.find_child("LblBalas*", true, false)
-		
+
 		var arma = armas_equipadas[i]
 		if arma != null:
 			if lbl_nombre: lbl_nombre.text = arma.nombre
-			
+
 			var balas_render = balas_en_cargador if i == slot_actual else cargadores_equipados[i]
 			var tipo_ammo = arma.tipo_municion
 			var reserva = municion_reserva.get(tipo_ammo, 0)
-			
-			if lbl_balas: 
+
+			if lbl_balas:
 				if esta_recargando and i == slot_actual:
 					lbl_balas.text = "RECARGANDO..."
 				else:
 					lbl_balas.text = str(balas_render) + " / " + str(reserva)
-			
+
 			if i == slot_actual:
 				slot_nodo.modulate = Color(1.0, 1.0, 1.0, 1.0)
 			else:
@@ -283,30 +356,156 @@ func actualizar_ui_municion():
 # ==========================================================
 # 7. EVENTOS RPG, DAÑO Y PROGRESIÓN
 # ==========================================================
+# --- FIX (revision de codigo) ---
+# Los zombies (que solo corren su IA en el servidor) llamaban
+# recibir_dano() DIRECTO sobre el nodo jugador. Eso funcionaba para
+# el Host (porque el Host ES el servidor), pero para un invitado, el
+# servidor solo tiene una copia local NO autoritativa de su personaje
+# -- salud_actual nunca esta sincronizada via MultiplayerSynchronizer
+# (la autoridad de este nodo es el jugador dueno, no el servidor), asi
+# que el dano nunca llegaba a la pantalla real del invitado.
+# Esta RPC hace que el dano se aplique sobre el nodo verdadero de cada
+# jugador, sea quien sea su dueno. "call_local" evita el error
+# ERR_INVALID_PARAMETER cuando el Host se ataca a si mismo (mismo bug
+# que ya resolvimos en declarar_listo_servidor).
+@rpc("any_peer", "call_local", "reliable")
+func recibir_dano_en_red(cantidad: int):
+	# Solo aceptamos dano que venga del servidor (id 1) o de nosotros
+	# mismos ejecutando localmente (remitente 0 = llamada local, gracias
+	# a call_local). Bloquea que un cliente modificado se mande dano
+	# arbitrario a si mismo o a otros.
+	var remitente = multiplayer.get_remote_sender_id()
+	if remitente != 0 and remitente != 1: return
+	recibir_dano(cantidad)
+
 func recibir_dano(cantidad: int):
+	# Un jugador ya derribado no puede "morir de nuevo" por más golpes que
+	# le lleguen mientras está en el suelo esperando reanimación.
+	if esta_caido: return
+
 	salud_actual -= cantidad
 	actualizar_ui_vida()
-	if salud_actual <= 0: morir()
+	if salud_actual <= 0: quedar_derribado()
 
-func morir():
-	# Si este jugador muere y es su autoridad, dispara el Game Over para su cliente
-	if is_multiplayer_authority():
+# --- NUEVO (mecánica de derribo/reanimación) ---
+# Antes esto era morir(): mataba al jugador al instante y disparaba el Game
+# Over solo para él, mientras el resto seguía jugando. Eso permitía que el
+# primero en morir presionara "Reintentar" (get_tree().reload_current_scene)
+# y recargara SU escena aunque el resto del equipo siguiera vivo y conectado
+# — la causa del bug de cámara desenfocada que viste. Ahora, en vez de morir,
+# el jugador queda "derribado": sigue visible en el suelo (para que lo puedan
+# encontrar y reanimar) pero no puede moverse ni disparar. El Game Over real
+# solo ocurre cuando TODOS los jugadores están derribados a la vez (ver
+# mundo.gd: revisar_todos_caidos() / ejecutar_game_over_en_red).
+func quedar_derribado():
+	esta_caido = true
+	salud_actual = 0
+	actualizar_ui_vida()
+
+	# --- FIX (revisión de código) ---
+	# "scale.y = 0.3" (escala NO uniforme) rompe a Jolt Physics: el motor no
+	# soporta escalar de forma distinta cada eje en un CollisionShape3D, y
+	# tira el error "A scale of (X, Y, Z) is not supported by Jolt Physics"
+	# en CADA frame de física mientras el jugador está derribado (además
+	# de aplicar una escala rara que ni siquiera es la que pedimos). Un
+	# escalado UNIFORME (mismo valor en los 3 ejes) sí es válido para Jolt.
+	# Sacrificamos el efecto de "aplastado" por uno de "encogido", pero sigue
+	# siendo visualmente claro que el jugador está fuera de combate, y no
+	# rompe la física.
+	scale = Vector3(0.55, 0.55, 0.55)
+
+	# Solo la instancia del SERVIDOR evalúa si esto significa Game Over
+	# (evita que cada cliente dispare su propia comprobación redundante).
+	if multiplayer.is_server():
 		var mundo = get_parent().get_parent() # Ajustado para subir desde ContenedorJugadores
-		if mundo.has_method("ejecutar_game_over"): mundo.ejecutar_game_over()
-	
-	visible = false
-	set_physics_process(false)
-	
+		if mundo.has_method("revisar_todos_caidos"): mundo.revisar_todos_caidos()
+
+# Revive este jugador. porcentaje_salud controla con cuánta vida vuelve:
+# 1.0 al pasar de oleada (descanso completo), menos si lo reanima un
+# compañero a mitad de la noche (para que no sea gratis).
+func revivir(porcentaje_salud: float = 1.0):
+	if not esta_caido: return
+	esta_caido = false
+	salud_actual = max(1, int(stat_salud_maxima * porcentaje_salud))
+	scale = Vector3(1.0, 1.0, 1.0)
+	actualizar_ui_vida()
+
+# --- RPC de reanimación ---
+# Igual que recibir_dano_en_red: esto corre en TODOS los peers (broadcast),
+# así que la copia real del jugador reanimado (sea de quien sea) se actualiza
+# en su propia pantalla, y la copia del servidor también, sin depender del
+# MultiplayerSynchronizer (que no replica salud_actual/esta_caido).
+@rpc("any_peer", "call_local", "reliable")
+func revivir_en_red(porcentaje_salud: float):
+	var remitente = multiplayer.get_remote_sender_id()
+	if remitente != 0 and remitente != 1: return
+	revivir(porcentaje_salud)
+
+# --- NUEVO (Fase 1.C: Reconexión en caliente) ---
+# El servidor llama esto cuando un jugador que estaba VIVO al desconectarse
+# (no derribado) vuelve a conectarse dentro de la ventana de gracia. Le
+# devuelve el control de este mismo nodo con la vida y posición que tenía
+# justo antes de caerse -- como si nunca se hubiera ido. Si estaba derribado
+# al caerse, el servidor NO llama esto (sigue derribado, esperando
+# reanimación normal, para no regalar una revivida gratis por desconectarse).
+@rpc("any_peer", "call_local", "reliable")
+func reconectar_en_red(salud_restaurada: int, posicion_restaurada: Vector3):
+	var remitente = multiplayer.get_remote_sender_id()
+	if remitente != 0 and remitente != 1: return
+	esta_caido = false
+	salud_actual = salud_restaurada
+	global_position = posicion_restaurada
+	scale = Vector3(1.0, 1.0, 1.0)
+	actualizar_ui_vida()
+
+# Busca, entre los jugadores vivos, si hay alguno derribado a corta
+# distancia (para la reanimación por proximidad).
+func buscar_companero_caido_cercano() -> Node3D:
+	for jug in get_tree().get_nodes_in_group("jugador"):
+		if jug == self or not is_instance_valid(jug): continue
+		if "esta_caido" in jug and jug.esta_caido:
+			if global_position.distance_to(jug.global_position) <= RADIO_REANIMACION:
+				return jug
+	return null
+
+# El cliente (vivo) le pide al servidor que reanime a un compañero derribado.
+# Validado en el servidor para que un cliente modificado no pueda revivir
+# gente a distancia o sin cumplir el tiempo de reanimación.
+# --- FIX (revisión de código) ---
+# Faltaba "call_local" acá. Cuando el HOST es quien reanima, su propio
+# rpc_id(1, ...) apunta a sí mismo (Host = servidor = id 1) -- exactamente
+# el mismo bug que ya resolvimos antes en declarar_listo_servidor ("RPC ...
+# on yourself is not allowed by selected mode"): sin call_local, Godot
+# rechaza la llamada y la función nunca corre. Por eso el Host podía SER
+# reanimado (el invitado sí llega al servidor real, que es otro peer), pero
+# no podía reanimar él mismo a nadie. El guard "if not multiplayer.is_server()"
+# de abajo sigue evitando que esto se ejecute dos veces cuando el que llama
+# es un cliente (la copia local del cliente entra y sale de inmediato).
+@rpc("any_peer", "call_local", "reliable")
+func solicitar_revivir_companero(nombre_nodo: String):
+	if not multiplayer.is_server(): return
+	var contenedor = get_parent()
+	if not contenedor or not contenedor.has_node(nombre_nodo): return
+
+	var companero = contenedor.get_node(nombre_nodo)
+	if not is_instance_valid(companero) or not ("esta_caido" in companero) or not companero.esta_caido:
+		return
+	if global_position.distance_to(companero.global_position) > RADIO_REANIMACION * 1.5:
+		return # margen extra por latencia, pero evita reanimar desde el otro lado del mapa
+
+	if companero.has_method("revivir_en_red"):
+		companero.revivir_en_red.rpc(0.5) # Reanimado a mitad de la noche: vuelve con 50% de vida
+
 func curar(porcentaje: float):
 	if salud_actual >= stat_salud_maxima: return
-	var cantidad_curacion = max(1, int(stat_salud_maxima * porcentaje)) 
+	var cantidad_curacion = max(1, int(stat_salud_maxima * porcentaje))
 	salud_actual = min(salud_actual + cantidad_curacion, stat_salud_maxima)
 	actualizar_ui_vida()
 
 func ganar_experiencia(cantidad: int):
 	experiencia_actual += cantidad
 	var xp_necesaria = 500 + (nivel * 200)
-	
+
 	if experiencia_actual >= xp_necesaria:
 		subir_nivel()
 	else:
@@ -314,44 +513,44 @@ func ganar_experiencia(cantidad: int):
 
 func subir_nivel():
 	var xp_necesaria = 500 + (nivel * 200)
-	experiencia_actual -= xp_necesaria 
+	experiencia_actual -= xp_necesaria
 	nivel += 1
 	puntos_mejora += 3
-	salud_actual = stat_salud_maxima 
-	
+	salud_actual = stat_salud_maxima
+
 	actualizar_ui_vida()
-	actualizar_ui_xp() 
-	
+	actualizar_ui_xp()
+
 	if not is_multiplayer_authority(): return
-	
+
 	if panel_nivel_up and lbl_puntos_mejora:
 		lbl_puntos_mejora.text = "+" + str(puntos_mejora) + " Puntos de Mejora"
 		panel_nivel_up.visible = true
 		panel_nivel_up.modulate.a = 0.0
-		
+
 		if tween_nivel: tween_nivel.kill()
 		tween_nivel = create_tween()
 		tween_nivel.tween_property(panel_nivel_up, "modulate:a", 1.0, 0.3)
 		tween_nivel.tween_interval(3.0)
 		tween_nivel.tween_property(panel_nivel_up, "modulate:a", 0.0, 0.5)
 		tween_nivel.tween_callback(func(): panel_nivel_up.visible = false)
-		
+
 	if experiencia_actual >= (500 + (nivel * 200)):
 		subir_nivel()
 
 func mejorar_estadistica(estadistica: String):
 	if puntos_mejora <= 0: return
-	
+
 	match estadistica:
 		"salud":
 			stat_salud_maxima += 10
-			salud_actual += 10 
+			salud_actual += 10
 			actualizar_ui_vida()
 		"agilidad": stat_agilidad += 0.2
 		"destreza": stat_destreza += 0.05
 		"ingenieria": stat_ingenieria += 0.1
 		"recoleccion": stat_recoleccion += 0.5
-			
+
 	puntos_mejora -= 1
 
 # --- SEÑALES LEGACY ---

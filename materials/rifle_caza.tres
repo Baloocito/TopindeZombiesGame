@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_mj8sh")
 nombre = "Rifle de Caza"
+tipo_municion = "Pesada"
 dano = 45
 cadencia = 1.2
 tamano_cargador = 5

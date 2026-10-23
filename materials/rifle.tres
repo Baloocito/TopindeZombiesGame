@@ -6,7 +6,7 @@
 script = ExtResource("1_c42ht")
 nombre = "Rifle de Clavos"
 dano = 15
-cadencia = 0.6
+cadencia = 6.0
 tamano_cargador = 20
 dispersion = 4.0
 penetra_enemigos = true

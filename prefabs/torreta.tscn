@@ -19,6 +19,17 @@ radial_segments = 65
 height = 3.0
 radius = 10.0
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_torreta"]
+properties/0/path = NodePath(".:salud_actual")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:balas_cargadas")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath("Cabezal:rotation")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+
 [node name="Torreta" type="StaticBody3D" unique_id=278846004 groups=["barricadas"]]
 script = ExtResource("1_2u65d")
 bala_escena = ExtResource("2_lbef0")
@@ -47,6 +58,9 @@ input_ray_pickable = false
 [node name="CollisionShape3D" type="CollisionShape3D" parent="AreaDeteccion" unique_id=352536127]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("CylinderShape3D_vciry")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_torreta")
 
 [connection signal="body_entered" from="AreaDeteccion" to="." method="_on_area_deteccion_body_entered"]
 [connection signal="body_exited" from="AreaDeteccion" to="." method="_on_area_deteccion_body_exited"]

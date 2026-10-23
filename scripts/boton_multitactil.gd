@@ -9,3 +9,4 @@ func _gui_input(event):
 	# Bloqueamos el "ratón fantasma" para que el botón no se presione dos veces
 	elif event is InputEventMouseButton:
 		accept_event()
+ 

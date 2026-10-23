@@ -18,6 +18,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 GuardadoGlobal="*uid://cx72602j8u0yg"
+EstadoPartida="*uid://4o0ke8wvbq5h"
 
 [display]
 

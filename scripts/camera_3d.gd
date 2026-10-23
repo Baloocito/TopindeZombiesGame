@@ -14,21 +14,36 @@ var punto_enfoque: Vector3
 var inicializado: bool = false
 
 func _physics_process(delta):
+	# --- FIX (revisión de código) ---
+	# Si el peer de red se cerró (el otro jugador se desconectó, o el juego
+	# está terminando), multiplayer.get_unique_id() tira un error de motor
+	# ("The multiplayer instance isn't currently active") en cada frame.
+	# Con este chequeo, simplemente dejamos de intentar buscar al jugador
+	# en vez de spamear el log.
+	if not multiplayer.has_multiplayer_peer():
+		return
+
 	# 1. Si la cámara no tiene un objetivo asignado, lo buscamos dinámicamente
 	if not objetivo:
-		var mi_id = str(multiplayer.get_unique_id()) # Obtenemos tu número de jugador
+		# --- FIX (revisión de código, Fase 1.C: Reconexión) ---
+		# Antes usaba multiplayer.get_unique_id() directo. Eso deja de servir
+		# apenas hay reconexión: tu id de red cambia cada vez que te
+		# reconectás, pero tu personaje sigue siendo el mismo nodo (con el
+		# nombre viejo). EstadoPartida.mi_id_logico es el que el servidor te
+		# informa como "tu nodo real" y no cambia aunque tu id de red sí.
+		var mi_id = str(EstadoPartida.mi_id_logico) # Nombre real de tu nodo de jugador
 		var contenedor = get_node_or_null("../ContenedorJugadores") # Buscamos la carpeta de clones
-		
+
 		# Si la carpeta existe y tu clon ya fue generado...
-		if contenedor and contenedor.has_node(mi_id):
+		if contenedor and EstadoPartida.mi_id_logico != -1 and contenedor.has_node(mi_id):
 			objetivo = contenedor.get_node(mi_id) # ¡Enganchamos el objetivo!
-			
+
 			# Calculamos las matemáticas iniciales (solo se hace una vez)
 			offset = global_position - objetivo.global_position
 			punto_enfoque = objetivo.global_position
 			inicializado = true
 			current = true # Encendemos esta cámara
-			
+
 		return # Pausamos la cámara hasta que encuentre al jugador
 
 	# 2. Si ya encontramos al jugador, ejecutamos tu excelente lógica de seguimiento

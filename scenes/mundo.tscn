@@ -168,11 +168,10 @@ shape = SubResource("ConcavePolygonShape3D_0vka0")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=897977415]
 transform = Transform3D(0.71017545, -0.6892503, -0.14347368, 0.6514401, 0.56606066, 0.5051748, -0.266977, -0.45222718, 0.8510074, 0.21735963, 11.092817, 0.7218034)
 
-[node name="Camera3D" type="Camera3D" parent="." unique_id=1681848175 node_paths=PackedStringArray("objetivo")]
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1681848175]
 transform = Transform3D(1, 0, 0, 0, 0.7547096, 0.6560591, 0, -0.656059, 0.7547097, 0, 10, 0)
 size = 25.0
 script = ExtResource("2_a2ps7")
-objetivo = NodePath("")
 margen_izquierdo = 5.0
 margen_derecho = 4.0
 margen_arriba = 9.0
@@ -750,8 +749,10 @@ mesh = SubResource("PlaneMesh_f7ym0")
 _spawnable_scenes = PackedStringArray("uid://x4o6yry24vgu", "uid://dkg3pc5sfq4a2")
 spawn_path = NodePath("../ContenedorJugadores")
 
-[connection signal="pressed" from="InterfazUI/BotonIniciar" to="." method="iniciar_oleada"]
-[connection signal="pressed" from="InterfazUI/BotonIniciar" to="." method="iniciar_oleada_en_red"]
+[node name="SpawnerEntidades" type="MultiplayerSpawner" parent="." unique_id=376737029]
+_spawnable_scenes = PackedStringArray("uid://dkg3pc5sfq4a2", "uid://cp626lbkpkoiw", "uid://0bgijxgy4tay", "uid://ds47qlx1j1ffj", "uid://cmgnqmsyyi1oh")
+spawn_path = NodePath("..")
+
 [connection signal="pressed" from="InterfazUI/BotonReparar" to="." method="ejecutar_reparacion_global"]
 [connection signal="pressed" from="InterfazUI/BotonReiniciar" to="." method="_on_boton_reiniciar_pressed"]
 [connection signal="pressed" from="InterfazUI/HudSuperiorIzquierdo/BotonNivel" to="." method="_on_boton_nivel_pressed"]

@@ -12,6 +12,14 @@ size = Vector3(2, 1, 2)
 [sub_resource type="BoxShape3D" id="BoxShape3D_ui3xg"]
 size = Vector3(2, 1, 2)
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_barricada"]
+properties/0/path = NodePath(".:salud_actual")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:scale")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+
 [node name="Barricada" type="StaticBody3D" unique_id=14374711 groups=["barricadas"]]
 script = ExtResource("1_413fb")
 
@@ -20,3 +28,6 @@ mesh = SubResource("BoxMesh_413fb")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2070079544]
 shape = SubResource("BoxShape3D_ui3xg")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_barricada")

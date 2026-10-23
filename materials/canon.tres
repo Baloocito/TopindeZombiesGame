@@ -10,5 +10,6 @@ dano = 200
 cadencia = 0.4
 tamano_cargador = 3
 tiempo_recarga = 4.0
-dispersion = 10.0
+dispersion = 0.0
+penetra_enemigos = true
 metadata/_custom_type_script = "uid://54rjamw0wjhd"
