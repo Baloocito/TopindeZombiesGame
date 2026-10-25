@@ -9,3 +9,6 @@ func _process(delta):
 func al_recoger_local(cuerpo: Node3D) -> void:
 	if cuerpo.has_method("curar"):
 		cuerpo.curar(porcentaje_curacion)
+
+func texto_recogida() -> Array:
+	return ["+%d%% vida" % int(porcentaje_curacion * 100), Color("#4ade80")]

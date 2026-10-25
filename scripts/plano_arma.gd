@@ -51,3 +51,7 @@ func al_recoger_servidor(_id_remitente: int) -> void:
 	var m = mundo()
 	if arma_id_contenida != "" and m and m.has_method("agregar_plano_para_todos"):
 		m.agregar_plano_para_todos.rpc(arma_id_contenida)
+
+func texto_recogida() -> Array:
+	var datos := Balance.arma(arma_id_contenida)
+	return ["Plano: " + str(datos.get("nombre", "arma")), COLORES_TIER.get(tier_del_plano, Color.WHITE)]

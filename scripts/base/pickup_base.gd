@@ -30,7 +30,14 @@ func puede_recoger(cuerpo: Node3D) -> bool:
 func recolectar(cuerpo: Node3D):
 	ya_recolectado = true
 	al_recoger_local(cuerpo)
+	var aviso := texto_recogida()
+	if not aviso.is_empty():
+		EstiloUI.texto_flotante(cuerpo.global_position, aviso[0], aviso[1])
 	_solicitar_recoleccion.rpc_id(1)
+
+# [texto, color] que se muestra flotando al recogerlo (vacío = nada).
+func texto_recogida() -> Array:
+	return []
 
 @rpc("any_peer", "call_local", "reliable")
 func _solicitar_recoleccion():

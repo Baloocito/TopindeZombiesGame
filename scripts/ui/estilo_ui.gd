@@ -65,3 +65,45 @@ static func agregar_rebote(boton: BaseButton) -> void:
 	boton.button_up.connect(func():
 		var t := boton.create_tween()
 		t.tween_property(boton, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
+
+# ==========================================================
+# TEXTO FLOTANTE (lo que recogiste: "+$25", "+36 Ligera"...)
+# ==========================================================
+# Aparece sobre el personaje, sube y se desvanece en un segundo. Va dentro de
+# un nodo "Efectos" para que el MultiplayerSpawner de Mundo no lo vea.
+const FUENTE := preload("res://assets/fuentes/RussoOne.woff2")
+
+static func texto_flotante(posicion: Vector3, texto: String, color: Color) -> void:
+	var arbol := Engine.get_main_loop() as SceneTree
+	var mundo := arbol.current_scene if arbol else null
+	if not mundo: return
+	var efectos := mundo.get_node_or_null("Efectos")
+	if not efectos:
+		efectos = Node3D.new()
+		efectos.name = "Efectos"
+		mundo.add_child(efectos)
+	var l := Label3D.new()
+	l.text = texto
+	l.font = FUENTE
+	l.font_size = 72
+	l.pixel_size = 0.0075
+	l.modulate = color
+	l.outline_modulate = Color(0, 0, 0, 0.7)
+	l.outline_size = 18
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.render_priority = 10
+	# Si se recogen varias cosas juntas, cada texto sale más arriba (solo cuentan los textos vivos).
+	var vivos := arbol.get_nodes_in_group("texto_flotante").size()
+	l.add_to_group("texto_flotante")
+	efectos.add_child(l)
+	l.global_position = posicion + Vector3(0, 1.9 + 0.55 * mini(vivos, 4), 0)
+	l.scale = Vector3.ONE * 0.4
+	var pop := l.create_tween()
+	pop.tween_property(l, "scale", Vector3.ONE * 1.15, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pop.tween_property(l, "scale", Vector3.ONE, 0.1)
+	var t := l.create_tween().set_parallel(true)
+	t.tween_property(l, "position:y", l.position.y + 1.2, 1.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	t.tween_property(l, "modulate:a", 0.0, 0.5).set_delay(0.8)
+	t.tween_property(l, "outline_modulate:a", 0.0, 0.5).set_delay(0.8)
+	t.chain().tween_callback(l.queue_free)

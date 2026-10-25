@@ -78,6 +78,7 @@ var arma_actual: ArmaData
 var slot_actual: int = 0
 var balas_en_cargador: int = 0
 var esta_recargando: bool = false
+var _id_recarga: int = 0  # cambia con cada recarga o cambio de arma: invalida recargas viejas
 var temporizador_disparo: float = 0.0
 
 var can_fire_fase: bool = false
@@ -205,6 +206,8 @@ func cambiar_arma(slot: int):
 	arma_actual = armas_equipadas[slot]
 	balas_en_cargador = cargadores_equipados[slot]
 
+	# Cambiar de arma cancela la recarga en curso (ver recargar()).
+	_id_recarga += 1
 	esta_recargando = false
 	temporizador_disparo = 1.0
 	actualizar_ui_municion()
@@ -276,10 +279,19 @@ func recargar():
 	if municion_reserva[tipo] <= 0: return
 
 	esta_recargando = true
+	_id_recarga += 1
+	var mi_recarga := _id_recarga
+	var arma_recargando := arma_actual
 	actualizar_ui_municion()
 
 	var tiempo_real = arma_actual.tiempo_recarga / stat_destreza
 	await get_tree().create_timer(tiempo_real).timeout
+
+	# Si durante la espera se cambió de arma, la recarga se cancela SIN gastar
+	# munición. Antes seguía de todas formas: cargaba el arma nueva con la
+	# munición del tipo viejo y el arma vieja se quedaba vacía.
+	if mi_recarga != _id_recarga or arma_actual != arma_recargando:
+		return
 
 	var balas_necesarias = arma_actual.tamano_cargador - balas_en_cargador
 	if municion_reserva[tipo] >= balas_necesarias:

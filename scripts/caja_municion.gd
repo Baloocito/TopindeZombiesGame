@@ -28,3 +28,6 @@ func _aplicar_color():
 func al_recoger_local(cuerpo: Node3D) -> void:
 	if cuerpo.has_method("recoger_municion"):
 		cuerpo.recoger_municion(cantidad_balas, tipo_municion)
+
+func texto_recogida() -> Array:
+	return ["+%d %s" % [cantidad_balas, tipo_municion], COLORES.get(tipo_municion, Color.WHITE)]

@@ -2,7 +2,7 @@ extends PickupBase
 # Moneda de oro. Vuela hacia el jugador más cercano dentro de su radio de
 # imán; el oro es del equipo, así que lo suma el servidor.
 
-var valor_oro: int = 20
+@export var valor_oro: int = 20
 var velocidad_vuelo: float = 8.0
 var jugador_objetivo: Node3D = null
 
@@ -27,3 +27,6 @@ func al_recoger_servidor(_id_remitente: int) -> void:
 	var m = mundo()
 	if m and m.has_method("sumar_dinero"):
 		m.sumar_dinero(valor_oro)
+
+func texto_recogida() -> Array:
+	return ["+$%d" % valor_oro, Color("#facc15")]
