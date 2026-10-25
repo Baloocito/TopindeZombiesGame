@@ -42,8 +42,6 @@ func _on_boton_abandonar_pressed():
 	# ¡NUEVO! Limpiamos la conexión antes de irnos
 	if multiplayer.multiplayer_peer:
 		multiplayer.multiplayer_peer.close()
+	multiplayer.multiplayer_peer = null
 		
 	get_tree().change_scene_to_file("res://scenes/menu_principal.tscn")
-
-func _on_boton_pausa_tactil_pressed() -> void:
-	alternar_pausa()

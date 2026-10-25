@@ -47,9 +47,6 @@ data = PackedVector3Array(25, 0, 25, -25, 0, 25, 25, 0, -25, -25, 0, 25, -25, 0,
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_ws26n"]
 texture = ExtResource("20_c58b4")
 
-[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_35q48"]
-load_path = "res://.godot/imported/AroJoystick.png-c7723deacbb2d24dbd9c9b6125bbebd4.ctex"
-
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_vnytd"]
 texture = ExtResource("13_c1ejn")
 
@@ -65,9 +62,6 @@ expand_margin_left = 10.0
 expand_margin_top = 5.0
 expand_margin_right = 10.0
 expand_margin_bottom = 5.0
-
-[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_c58b4"]
-load_path = "res://.godot/imported/MarcoVacio.png-21d1d530cba06868abaf04608b747218.ctex"
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_35q48"]
 bg_color = Color(0.10980392, 0.10980392, 0.10980392, 1)
@@ -244,7 +238,7 @@ offset_bottom = -146.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = SubResource("CompressedTexture2D_35q48")
+texture = ExtResource("12_f7ym0")
 expand_mode = 1
 stretch_mode = 5
 script = ExtResource("4_75jji")
@@ -299,7 +293,7 @@ offset_right = 259.0
 offset_bottom = -257.0
 grow_vertical = 0
 mouse_filter = 2
-texture = SubResource("CompressedTexture2D_35q48")
+texture = ExtResource("12_f7ym0")
 expand_mode = 1
 stretch_mode = 5
 script = ExtResource("4_75jji")
@@ -465,7 +459,7 @@ theme_override_constants/separation = 15
 [node name="SlotArma1" type="TextureButton" parent="InterfazUI/EsquinaArmas/ContenedorArmas" unique_id=149767599]
 custom_minimum_size = Vector2(120, 80)
 layout_mode = 2
-texture_normal = SubResource("CompressedTexture2D_c58b4")
+texture_normal = ExtResource("16_0iwyf")
 ignore_texture_size = true
 stretch_mode = 5
 script = ExtResource("12_w7nu4")

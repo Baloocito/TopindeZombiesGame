@@ -13,10 +13,16 @@ Objetivo: Android y PC, con controles táctiles, teclado y mouse, y mando.
 3. Ejecutar la escena principal (menú). Para probar el coop en un solo PC: *Depurar > Ejecutar múltiples instancias*.
 
 ## Estructura
+- `data/` **todo el balance** en JSON (armas, zombies, estructuras, progresión). Para ajustar el juego se edita aquí, no el código.
 - `scenes/` escenas (menú, lobby, mundo, pausa)
-- `scripts/` lógica en GDScript
+- `scripts/autoload/` singletons: `Balance` (lee data/), `EstadoPartida` (sesión y red), `GuardadoGlobal` (récords)
+- `scripts/base/` clases base: `PickupBase` (objetos recogibles) y `EstructuraBase` (barricadas y torreta)
+- `scripts/mundo/` partes de Mundo separadas: `menus_mundo.gd` (panel lateral) y `loot_mundo.gd` (qué cae al morir un zombie)
+- `scripts/` resto de la lógica (jugador, zombie, torreta, lobby...)
 - `prefabs/` jugador, zombie, estructuras, pickups
-- `materials/` armas y materiales
 - `assets/` imágenes y modelos
+
+## Reglas de red
+El anfitrión es la autoridad. Todo lo que cuesta oro o afecta al equipo se pide al servidor con `rpc_id(1, ...)` y él lo reparte. Los objetos recogibles los destruye solo el servidor. Ver el Manual v3 §11.
 
 El manual de diseño vigente (v3) es la fuente de verdad del balance y de las fases de desarrollo.

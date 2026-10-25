@@ -189,13 +189,44 @@ func mostrar_overlay_texto(texto: String) -> void:
 			_overlay.visible = false
 	)
 
+# true mientras un cliente que estaba en el Lobby recarga Mundo para volver
+# a entrar a una partida en curso (ver avisar_partida_en_curso).
+var cliente_reentrando: bool = false
+
 @rpc("authority", "call_local", "reliable")
 func avisar_partida_en_curso():
-	# Si ya estoy en Mundo (por ejemplo soy el propio servidor, o ya cargué
-	# la escena por otra vía), no hacemos nada.
 	var escena_actual = get_tree().current_scene
 	if escena_actual and escena_actual.scene_file_path == "res://scenes/mundo.tscn":
+		# Ya estamos en Mundo (reconexión tras perder el foco, o la re-entrada
+		# de abajo): le pedimos al servidor que nos ponga al día con nuestro
+		# token. Antes la reconexión automática nunca pedía esto, así que el
+		# servidor no devolvía el personaje.
+		cliente_reentrando = false
+		mostrar_overlay_texto("Sincronizando partida…")
+		escena_actual.solicitar_sincronizacion_tardia.rpc_id(1, mi_token)
 		return
+	# Estamos en el Lobby. Si seguimos conectados mientras cargamos Mundo, el
+	# servidor nos manda los jugadores y zombies que ya existen ANTES de que
+	# exista la escena, y la replicación de ese spawner queda rota para siempre
+	# (no veíamos ni nuestro propio personaje). Cortamos, cargamos Mundo y
+	# volvemos a conectarnos desde ahí.
+	print("EstadoPartida: la partida ya está en curso, cargando Mundo para volver a entrar.")
+	cliente_reentrando = true
+	_cerrar_y_cargar_mundo.call_deferred()
 
-	print("EstadoPartida: la partida ya está en curso, saltando directo a Mundo.")
+func _cerrar_y_cargar_mundo():
+	if multiplayer.multiplayer_peer:
+		multiplayer.multiplayer_peer.close()
+	multiplayer.multiplayer_peer = null
 	get_tree().change_scene_to_file("res://scenes/mundo.tscn")
+
+# La llama mundo.gd al cargar cuando cliente_reentrando es true.
+func conectar_como_cliente() -> void:
+	var peer := ENetMultiplayerPeer.new()
+	var ip := ultima_ip if ultima_ip != "" else "127.0.0.1"
+	if peer.create_client(ip, PUERTO_RED) != OK:
+		cliente_reentrando = false
+		mostrar_overlay_texto("No se pudo volver a la partida.")
+		return
+	multiplayer.multiplayer_peer = peer
+	mostrar_overlay_texto("Volviendo a la partida…")

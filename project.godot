@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+Balance="*res://scripts/autoload/balance.gd"
 GuardadoGlobal="*uid://cx72602j8u0yg"
 EstadoPartida="*uid://4o0ke8wvbq5h"
 

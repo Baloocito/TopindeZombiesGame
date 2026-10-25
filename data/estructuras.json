@@ -1,0 +1,9 @@
+{
+  "_nota": "Manual v3 §9. inflacion = cuanto sube el precio por cada una ya construida.",
+  "madera":    {"nombre": "Valla Madera",     "precio": 150,  "inflacion": 0.10, "hp": 500},
+  "puas":      {"nombre": "Alambre Púas",     "precio": 300,  "inflacion": 0.15, "hp": 300},
+  "barril":    {"nombre": "Barril Explosivo", "precio": 250,  "inflacion": 0.0,  "hp": 1},
+  "acero":     {"nombre": "Barrera Acero",    "precio": 600,  "inflacion": 0.20, "hp": 2000},
+  "electrico": {"nombre": "Muro Eléctrico",   "precio": 1000, "inflacion": 0.25, "hp": 1200},
+  "torreta":   {"nombre": "Base Torreta",     "precio": 1500, "inflacion": 0.30, "hp": 800}
+}

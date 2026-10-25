@@ -1,12 +1,9 @@
-extends StaticBody3D
+extends EstructuraBase
 
 # ==========================================================
 # 1. ESTADÍSTICAS Y ESTADO
 # ==========================================================
 @export_category("Configuración")
-var salud_maxima: int = 100
-var salud_actual: int
-var tipo_estructura: String = ""
 
 # --- SISTEMA DE COMBATE ---
 var arma_equipada: ArmaData = null
@@ -29,7 +26,7 @@ var alineado_para_disparar: bool = false
 # 2. INICIALIZACIÓN Y LOOP PRINCIPAL
 # ==========================================================
 func _ready():
-	salud_actual = salud_maxima
+	super._ready()
 
 func _physics_process(delta):
 	# --- FIX (revisión de código) ---
@@ -147,31 +144,6 @@ func buscar_nuevo_objetivo():
 # ==========================================================
 # 5. SISTEMA DE DAÑO Y REPARACIÓN
 # ==========================================================
-func recibir_dano(cantidad: int):
-	# --- FIX (revisión de código) ---
-	# Igual que barricada.gd, esto debe correr solo en el servidor: si no,
-	# cada cliente descuenta vida de su copia local de forma independiente
-	# y podría hacer que la torreta se destruya (queue_free) en un cliente
-	# sin que el servidor (el que realmente importa) se entere.
-	if not multiplayer.is_server(): return
-
-	salud_actual -= cantidad
-	if salud_actual <= 0:
-		var mundo = get_parent()
-		if mundo.has_method("generar_chatarra"):
-			mundo.generar_chatarra(global_position)
-		queue_free()
-
-func obtener_costo_reparacion(precio_base_nuevo: int) -> int:
-	if salud_actual >= salud_maxima: return 0
-	var porcentaje_dano = 1.0 - (float(salud_actual) / float(salud_maxima))
-	return int((precio_base_nuevo * 0.5) * porcentaje_dano)
-
-func reparar_completamente():
-	if not multiplayer.is_server(): return
-	salud_actual = salud_maxima
-
-# --- INTERACCIÓN TÁCTIL ---
 func _input_event(camera, event, position, normal, shape_idx):
 	var es_clic = event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed
 	var es_toque = event is InputEventScreenTouch and event.pressed
@@ -180,3 +152,22 @@ func _input_event(camera, event, position, normal, shape_idx):
 		var mundo = get_tree().current_scene
 		if mundo.has_method("abrir_menu_inspector"):
 			mundo.abrir_menu_inspector(self)
+
+# ==========================================================
+# ARMA Y BALAS EN RED
+# ==========================================================
+# Antes el menú del inspector cambiaba arma_equipada y balas_cargadas solo en
+# la pantalla de quien lo usaba. Como la torreta dispara en el servidor, una
+# torreta armada por el jugador 2 nunca disparaba. Ahora todo pasa por aquí.
+
+# datos vacío = desinstalar.
+@rpc("any_peer", "call_local", "reliable")
+func instalar_arma_en_red(datos: Dictionary):
+	arma_equipada = null if datos.is_empty() else ArmaData.desde_diccionario(datos)
+	if datos.is_empty() and multiplayer.is_server():
+		balas_cargadas = 0
+
+@rpc("any_peer", "call_local", "reliable")
+func agregar_balas_en_red(cantidad: int):
+	if not multiplayer.is_server(): return
+	balas_cargadas = max(0, balas_cargadas + cantidad)

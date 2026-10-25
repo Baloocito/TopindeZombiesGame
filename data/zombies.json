@@ -1,0 +1,8 @@
+{
+  "_nota": "Valores base de la noche 1 (Manual v3 §7). dano_estructuras solo lo usa el Explosivo.",
+  "basico":    {"vida": 40,   "dano": 15, "dano_estructuras": 15,  "velocidad": 1.8, "costo": 10,   "desde_noche": 1, "escala": 1.0, "oro_bounty": 10,  "oro_base": 25,   "prob_oro": 0.6},
+  "corredor":  {"vida": 25,   "dano": 8,  "dano_estructuras": 8,   "velocidad": 4.0, "costo": 25,   "desde_noche": 3, "escala": 0.8, "oro_bounty": 15,  "oro_base": 45,   "prob_oro": 0.7},
+  "tanque":    {"vida": 300,  "dano": 40, "dano_estructuras": 40,  "velocidad": 1.2, "costo": 80,   "desde_noche": 6, "escala": 1.4, "oro_bounty": 50,  "oro_base": 150,  "prob_oro": 1.0},
+  "explosivo": {"vida": 60,   "dano": 60, "dano_estructuras": 150, "velocidad": 2.5, "costo": 60,   "desde_noche": 8, "escala": 1.1, "oro_bounty": 20,  "oro_base": 70,   "prob_oro": 0.8},
+  "boss":      {"vida": 1200, "dano": 70, "dano_estructuras": 70,  "velocidad": 3.0, "costo": 1000, "desde_noche": 5, "escala": 2.5, "oro_bounty": 500, "oro_base": 2000, "prob_oro": 1.0}
+}

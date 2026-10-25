@@ -1,0 +1,61 @@
+{
+  "_nota": "Manual v3 §5, §8 y §9. Cambiar aqui ajusta el juego sin tocar codigo.",
+  "dinero_inicial": 500,
+  "multiplicador_precio_por_jugador": 0.25,
+  "reparaciones_por_dia": 1,
+  "arma_inicial": "pistola",
+  "municion_inicial": {"Ligera": 90, "Pesada": 12, "Energia": 0},
+
+  "xp_base_nivel": 80,
+  "xp_por_nivel": 30,
+  "xp_por_costo_baja": 0.8,
+  "xp_noche_base": 60,
+  "xp_noche_por_noche": 10,
+  "nivel_maximo": 40,
+  "puntos_por_nivel": 3,
+
+  "escalado": {
+    "vida_por_noche": 0.15,
+    "vida_por_noche_eternas": 0.30,
+    "dano_por_noche": 0.06,
+    "velocidad_por_noche": 0.01,
+    "velocidad_tope": 0.15,
+    "presupuesto_base": 80,
+    "presupuesto_por_noche": 28,
+    "presupuesto_por_noche_eternas": 56,
+    "presupuesto_por_jugador": 0.6,
+    "simultaneos_base": 16,
+    "simultaneos_por_noche": 1.5,
+    "simultaneos_por_jugador": 0.25,
+    "simultaneos_tope": 70,
+    "noches_campana": 20,
+    "cada_cuantas_noches_jefe": 5,
+    "dps_esperado_base": 25,
+    "dps_esperado_por_noche": 0.22,
+    "vida_jefe_por_jugador": 0.85,
+    "duracion_jefe": {"5": 60, "10": 75, "15": 90, "20": 150},
+    "intervalo_spawn_base": 2.0,
+    "intervalo_spawn_por_noche": 0.1,
+    "intervalo_spawn_minimo": 0.2,
+    "oro_por_noche": 0.15
+  },
+
+  "loot": {
+    "umbral_municion": 61,
+    "umbral_botiquin": 86,
+    "umbral_plano": 96,
+    "pity_por_fallo": 0.5,
+    "multiplicador_municion_ligera": 3,
+    "multiplicador_municion_otra": 2,
+    "tier_plano_por_noche": [[1, 1], [3, 2], [7, 3], [12, 4]],
+    "valor_chatarra_estructura": 20
+  },
+
+  "stats": {
+    "salud":       {"base": 100, "por_punto": 10,   "tope_puntos": 25},
+    "agilidad":    {"base": 4.0, "por_punto": 0.2,  "tope_puntos": 15},
+    "destreza":    {"base": 1.0, "por_punto": 0.05, "tope_puntos": 20},
+    "ingenieria":  {"base": 1.0, "por_punto": 0.1,  "tope_puntos": 25},
+    "recoleccion": {"base": 3.0, "por_punto": 0.5,  "tope_puntos": 12}
+  }
+}

@@ -11,6 +11,14 @@ size = Vector3(0.4, 0.4, 0.4)
 emission_enabled = true
 emission = Color(7.191431, 6.8593383, 6.4970536, 1)
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_spawn"]
+properties/0/path = NodePath(".:arma_id_contenida")
+properties/0/spawn = true
+properties/0/replication_mode = 0
+properties/1/path = NodePath(".:tier_del_plano")
+properties/1/spawn = true
+properties/1/replication_mode = 0
+
 [node name="PlanoArma" type="Area3D" unique_id=558526395]
 collision_mask = 2
 script = ExtResource("1_5i450")
@@ -26,3 +34,6 @@ surface_material_override/0 = SubResource("StandardMaterial3D_vqbw8")
 
 [node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1414169407]
 light_energy = 2.0
+
+[node name="SincronizadorSpawn" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_spawn")

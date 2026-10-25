@@ -64,7 +64,6 @@ var tween_nivel: Tween
 @export_category("Ajustes de Combate")
 @export var bala_escena: PackedScene
 @onready var punto_disparo = $PuntoDisparo
-const PISTOLA_INICIAL = preload("res://materials/pistola.tres")
 # Máximo error (radianes, ~20°) entre hacia dónde mira el cuerpo y hacia dónde
 # apunta el joystick para poder disparar. Evita gastar balas en la dirección vieja
 # mientras el personaje todavía está girando.
@@ -82,11 +81,10 @@ var temporizador_disparo: float = 0.0
 
 var can_fire_fase: bool = false
 
-var municion_reserva: Dictionary = {
-	"Ligera": 90,
-	"Pesada": 12,
-	"Energia": 0
-}
+var municion_reserva: Dictionary = {}
+
+# Puntos invertidos en cada stat (para respetar el tope del Manual v3 §5).
+var puntos_en_stat: Dictionary = {"salud": 0, "agilidad": 0, "destreza": 0, "ingenieria": 0, "recoleccion": 0}
 
 # ==========================================================
 # 3. INICIALIZACIÓN (¡BLINDADA PARA MULTIJUGADOR!)
@@ -103,6 +101,14 @@ func _ready():
 	# el mismo valor a una copia que no es tuya, y es justo lo que necesita
 	# el servidor para poder evaluar correctamente "salud_actual > 0" sobre
 	# CUALQUIER jugador al elegir presa en buscar_presa_mas_cercana().
+	# Valores iniciales desde data/progresion.json (Balance).
+	stat_salud_maxima = int(Balance.stat("salud")["base"])
+	stat_agilidad = float(Balance.stat("agilidad")["base"])
+	stat_destreza = float(Balance.stat("destreza")["base"])
+	stat_ingenieria = float(Balance.stat("ingenieria")["base"])
+	stat_recoleccion = float(Balance.stat("recoleccion")["base"])
+	municion_reserva = Balance.progresion["municion_inicial"].duplicate()
+	for tipo in municion_reserva.keys(): municion_reserva[tipo] = int(municion_reserva[tipo])
 	salud_actual = stat_salud_maxima
 
 	# Si tú eres el dueño absoluto de este clon específico:
@@ -110,23 +116,14 @@ func _ready():
 		actualizar_ui_vida()
 		actualizar_ui_xp()
 
-		# --- FIX (revisión de código) ---
-		# preload()/load() cachean el Resource: sin .duplicate(), TODOS los
-		# jugadores terminaban compartiendo el MISMO objeto ArmaData para la
-		# pistola/escopeta/smg iniciales. Como "Forjar Mejora Aleatoria" en
-		# mundo.gd modifica los stats del arma directamente (arma.dano += ...),
-		# mejorar tu pistola inicial mejoraba la de TODOS los jugadores, y el
-		# cambio persistía incluso reiniciando la partida (solo se resetea
-		# cerrando el proceso del juego del todo).
-		var pistola_inicial: ArmaData = PISTOLA_INICIAL.duplicate()
-		armas_inventario.append(pistola_inicial)
-		equipar_en_slot(pistola_inicial, 0)
-		cambiar_arma(0)
-
-		var escopeta = load("res://materials/escopeta.tres")
-		var smg = load("res://materials/smg.tres")
-		if escopeta: armas_inventario.append(escopeta.duplicate())
-		if smg: armas_inventario.append(smg.duplicate())
+		# Arma inicial creada desde data/armas.json: cada jugador recibe su
+		# propia copia (mejorarla no afecta a nadie más). Antes además se
+		# regalaban Escopeta y SMG al empezar (restos de pruebas).
+		var arma_inicial: ArmaData = Balance.crear_arma(Balance.progresion["arma_inicial"])
+		if arma_inicial:
+			armas_inventario.append(arma_inicial)
+			equipar_en_slot(arma_inicial, 0)
+			cambiar_arma(0)
 
 
 func set_can_fire(valor: bool) -> void:
@@ -322,7 +319,7 @@ func actualizar_ui_xp():
 	if not is_multiplayer_authority(): return
 
 	if lbl_nivel and barra_xp:
-		var xp_necesaria = 500 + (nivel * 200)
+		var xp_necesaria = Balance.xp_para_nivel(nivel)
 		lbl_nivel.text = "NIVEL %s" % nivel
 		barra_xp.max_value = xp_necesaria
 		var tween = create_tween()
@@ -512,8 +509,9 @@ func curar(porcentaje: float):
 	actualizar_ui_vida()
 
 func ganar_experiencia(cantidad: int):
+	if nivel >= int(Balance.progresion["nivel_maximo"]): return
 	experiencia_actual += cantidad
-	var xp_necesaria = 500 + (nivel * 200)
+	var xp_necesaria = Balance.xp_para_nivel(nivel)
 
 	if experiencia_actual >= xp_necesaria:
 		subir_nivel()
@@ -521,10 +519,10 @@ func ganar_experiencia(cantidad: int):
 		actualizar_ui_xp()
 
 func subir_nivel():
-	var xp_necesaria = 500 + (nivel * 200)
+	var xp_necesaria = Balance.xp_para_nivel(nivel)
 	experiencia_actual -= xp_necesaria
 	nivel += 1
-	puntos_mejora += 3
+	puntos_mejora += int(Balance.progresion["puntos_por_nivel"])
 	salud_actual = stat_salud_maxima
 
 	actualizar_ui_vida()
@@ -544,24 +542,26 @@ func subir_nivel():
 		tween_nivel.tween_property(panel_nivel_up, "modulate:a", 0.0, 0.5)
 		tween_nivel.tween_callback(func(): panel_nivel_up.visible = false)
 
-	if experiencia_actual >= (500 + (nivel * 200)):
+	if experiencia_actual >= Balance.xp_para_nivel(nivel) and nivel < int(Balance.progresion["nivel_maximo"]):
 		subir_nivel()
 
 func mejorar_estadistica(estadistica: String):
-	if puntos_mejora <= 0: return
+	if puntos_mejora <= 0 or not puntos_en_stat.has(estadistica): return
+	if stat_en_tope(estadistica): return
+	var por_punto = Balance.stat(estadistica)["por_punto"]
 
 	match estadistica:
 		"salud":
-			stat_salud_maxima += 10
-			salud_actual += 10
+			stat_salud_maxima += int(por_punto)
+			salud_actual += int(por_punto)
 			actualizar_ui_vida()
-		"agilidad": stat_agilidad += 0.2
-		"destreza": stat_destreza += 0.05
-		"ingenieria": stat_ingenieria += 0.1
-		"recoleccion": stat_recoleccion += 0.5
+		"agilidad": stat_agilidad += float(por_punto)
+		"destreza": stat_destreza += float(por_punto)
+		"ingenieria": stat_ingenieria += float(por_punto)
+		"recoleccion": stat_recoleccion += float(por_punto)
 
+	puntos_en_stat[estadistica] += 1
 	puntos_mejora -= 1
 
-# --- SEÑALES LEGACY ---
-func _on_boton_cambiar_arma_pressed() -> void: ciclo_arma_rapido()
-func _on_boton_recargar_pressed(): recargar()
+func stat_en_tope(estadistica: String) -> bool:
+	return puntos_en_stat.get(estadistica, 0) >= int(Balance.stat(estadistica)["tope_puntos"])

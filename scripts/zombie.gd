@@ -8,15 +8,15 @@ var tipo_zombie: String = "basico"
 var costo_en_presupuesto: int = 10
 
 @export_category("Estadísticas de Combate")
-var salud_maxima_base: int = 40
 var velocidad: float = 1.8
-var dano_ataque_base: int = 15
 var cadencia_ataque: float = 1.0
 var rango_ataque: float = 1.5
 
 var salud_maxima: int = 40
 var salud_actual: int
 var dano_ataque_actual: int
+var dano_estructuras: int = 15
+const RADIO_EXPLOSION: float = 3.0
 
 # --- HABILIDADES DE JEFE ---
 var cooldown_habilidad: float = 5.0
@@ -62,48 +62,25 @@ func buscar_presa_mas_cercana() -> Node3D:
 # 3. NACIMIENTO Y ESCALADO INFINITO (RPG)
 # ==========================================================
 func nacer(numero_oleada: int, costo: int, tipo: String = "basico"):
+	# Todos los números salen de data/zombies.json y de las fórmulas del
+	# Manual v3 §8 (Balance). La vida ya no se multiplica por jugadores: en
+	# coop sube la CANTIDAD de zombies (presupuesto), no su vida.
+	var datos := Balance.zombie(tipo)
 	costo_en_presupuesto = costo
 	tipo_zombie = tipo
-	rango_ataque = 1.2 * scale.x
-
-	match tipo:
-		"corredor":
-			salud_maxima_base = 25
-			dano_ataque_base = 8
-			velocidad = 4.0
-			scale = Vector3(0.8, 0.8, 0.8)
-		"explosivo":
-			salud_maxima_base = 60
-			dano_ataque_base = 150
-			velocidad = 2.5
-			scale = Vector3(1.1, 1.1, 1.1)
-		"tanque":
-			salud_maxima_base = 300
-			dano_ataque_base = 40
-			velocidad = 1.2
-			scale = Vector3(1.4, 1.4, 1.4)
-		"boss":
-			salud_maxima_base = 1200
-			dano_ataque_base = 70
-			velocidad = 3.0
-			scale = Vector3(2.5, 2.5, 2.5)
-		_:
-			salud_maxima_base = 40
-			dano_ataque_base = 15
-			velocidad = 1.8
-			scale = Vector3(1, 1, 1)
-
-	var multiplicador_hp_ola = pow(1.12, numero_oleada - 1)
-	var cantidad_jugadores = max(1, get_tree().get_nodes_in_group("jugador").size())
-	var multiplicador_coop = 1.0 + ((cantidad_jugadores - 1) * 0.60)
-
-	salud_maxima = int(salud_maxima_base * multiplicador_hp_ola * multiplicador_coop)
+	var escala := float(datos["escala"])
+	scale = Vector3.ONE * escala
+	rango_ataque = 1.2 * escala
+	velocidad = Balance.escalar_velocidad(float(datos["velocidad"]), numero_oleada)
+	if tipo == "boss":
+		var jugadores := maxi(1, get_tree().get_nodes_in_group("jugador").size())
+		salud_maxima = Balance.vida_jefe(numero_oleada, jugadores)
+	else:
+		salud_maxima = Balance.escalar_vida(float(datos["vida"]), numero_oleada)
 	salud_actual = salud_maxima
-	dano_ataque_actual = dano_ataque_base + (2 * numero_oleada)
+	dano_ataque_actual = Balance.escalar_dano(float(datos["dano"]), numero_oleada)
+	dano_estructuras = Balance.escalar_dano(float(datos["dano_estructuras"]), numero_oleada)
 
-# ==========================================================
-# 4. INTELIGENCIA ARTIFICIAL Y FÍSICAS
-# ==========================================================
 func _physics_process(delta):
 	# ¡FILTRO DE RED! Solo la máquina del Host calcula dónde camina el zombie.
 	# Los clientes solo lo ven moverse gracias al MultiplayerSynchronizer.
@@ -168,14 +145,13 @@ func detener_movimiento():
 # ==========================================================
 func atacar(objetivo):
 	puede_atacar = false
-	# --- FIX (revisión de código) ---
-	# objetivo.recibir_dano(...) era una llamada LOCAL directa: solo
-	# afectaba la copia no-autoritativa que el servidor tiene del jugador
-	# invitado, nunca llegaba a su pantalla real. recibir_dano_en_red es
-	# una RPC que sí llega al nodo verdadero, sea de quien sea.
-	if is_instance_valid(objetivo) and objetivo.has_method("recibir_dano_en_red"):
-		objetivo.recibir_dano_en_red.rpc(dano_ataque_actual)
-
+	if is_instance_valid(objetivo):
+		# Antes solo se buscaba recibir_dano_en_red, que las estructuras no
+		# tienen: los zombies nunca dañaban barricadas ni torretas.
+		if objetivo.is_in_group("barricadas") and objetivo.has_method("recibir_dano"):
+			objetivo.recibir_dano(dano_estructuras)
+		elif objetivo.has_method("recibir_dano_en_red"):
+			objetivo.recibir_dano_en_red.rpc(dano_ataque_actual)
 	await get_tree().create_timer(cadencia_ataque).timeout
 	if is_instance_valid(self) and not esta_muerto:
 		puede_atacar = true
@@ -218,23 +194,14 @@ func ejecutar_golpe_sismico():
 
 func explotar():
 	puede_atacar = false
-	# --- FIX (revisión de código) --- misma razón que en atacar()
 	if is_instance_valid(jugador_objetivo) and jugador_objetivo.has_method("recibir_dano_en_red"):
 		jugador_objetivo.recibir_dano_en_red.rpc(dano_ataque_actual)
-
+	# La explosión también golpea las estructuras cercanas (150 base, §7).
+	for defensa in get_tree().get_nodes_in_group("barricadas"):
+		if is_instance_valid(defensa) and global_position.distance_to(defensa.global_position) <= RADIO_EXPLOSION:
+			if defensa.has_method("recibir_dano"): defensa.recibir_dano(dano_estructuras)
 	recibir_dano(salud_actual)
 
-# ==========================================================
-# 6. SISTEMA DE DAÑO Y MUERTE (BLINDADO EN RED)
-# ==========================================================
-# --- FIX (revisión de código) ---
-# Las balas se simulan de forma independiente en cada pantalla (cada peer
-# instancia su propia copia local al disparar). Antes, bala.gd llamaba
-# recibir_dano() directo sobre el zombie que chocaba localmente: para el
-# Host eso SÍ era el zombie real, pero para el invitado era solo su copia
-# replicada (puppet), así que sus balas nunca hacían daño real. Esta RPC
-# hace que el impacto se reporte al nodo verdadero del zombie sin importar
-# en la pantalla de quién ocurrió la colisión.
 @rpc("any_peer", "call_local", "reliable")
 func recibir_dano_en_red(cantidad: int):
 	recibir_dano(cantidad)

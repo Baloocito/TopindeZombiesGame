@@ -1,0 +1,13 @@
+{
+  "_nota": "Valores del Manual v3 (§6). DPS efectivo por tier: T1 20-50, T2 50-75, T3 75-100, T4 100-140.",
+  "pistola":       {"nombre": "Pistola 9mm",     "municion": "Ligera",  "tier": 1, "dano": 10,  "cadencia": 3.0,  "cargador": 12,  "recarga": 1.2, "balas_por_disparo": 1, "dispersion": 2.0,  "dano_area": 0,   "penetra": false, "costo_ensamblaje": 0},
+  "escopeta":      {"nombre": "Escopeta Vieja",  "municion": "Pesada",  "tier": 1, "dano": 12,  "cadencia": 0.8,  "cargador": 2,   "recarga": 2.5, "balas_por_disparo": 6, "dispersion": 15.0, "dano_area": 0,   "penetra": false, "costo_ensamblaje": 400},
+  "smg":           {"nombre": "SMG Viper",       "municion": "Ligera",  "tier": 2, "dano": 8,   "cadencia": 10.0, "cargador": 30,  "recarga": 1.8, "balas_por_disparo": 1, "dispersion": 8.0,  "dano_area": 0,   "penetra": false, "costo_ensamblaje": 1200},
+  "rifle_caza":    {"nombre": "Rifle de Caza",   "municion": "Pesada",  "tier": 2, "dano": 60,  "cadencia": 1.2,  "cargador": 5,   "recarga": 2.0, "balas_por_disparo": 1, "dispersion": 0.5,  "dano_area": 0,   "penetra": true,  "costo_ensamblaje": 1200},
+  "clavos":        {"nombre": "Rifle de Clavos", "municion": "Ligera",  "tier": 2, "dano": 14,  "cadencia": 6.0,  "cargador": 20,  "recarga": 1.7, "balas_por_disparo": 1, "dispersion": 4.0,  "dano_area": 0,   "penetra": true,  "costo_ensamblaje": 1200},
+  "ballesta":      {"nombre": "Ballesta Expl.",  "municion": "Pesada",  "tier": 3, "dano": 40,  "cadencia": 0.6,  "cargador": 3,   "recarga": 2.5, "balas_por_disparo": 1, "dispersion": 1.0,  "dano_area": 60,  "penetra": false, "costo_ensamblaje": 2500},
+  "lanzallamas":   {"nombre": "Lanzallamas",     "municion": "Energia", "tier": 3, "dano": 5,   "cadencia": 15.0, "cargador": 50,  "recarga": 3.0, "balas_por_disparo": 1, "dispersion": 12.0, "dano_area": 0,   "penetra": true,  "costo_ensamblaje": 2500},
+  "minigun":       {"nombre": "Minigun",         "municion": "Ligera",  "tier": 4, "dano": 11,  "cadencia": 20.0, "cargador": 100, "recarga": 5.0, "balas_por_disparo": 1, "dispersion": 10.0, "dano_area": 0,   "penetra": false, "costo_ensamblaje": 5000},
+  "riel":          {"nombre": "Cañón de Riel",   "municion": "Energia", "tier": 4, "dano": 240, "cadencia": 0.4,  "cargador": 3,   "recarga": 4.0, "balas_por_disparo": 1, "dispersion": 0.0,  "dano_area": 0,   "penetra": true,  "costo_ensamblaje": 5000},
+  "lanzagranadas": {"nombre": "Lanzagranadas",   "municion": "Pesada",  "tier": 4, "dano": 150, "cadencia": 0.5,  "cargador": 4,   "recarga": 3.5, "balas_por_disparo": 1, "dispersion": 2.0,  "dano_area": 150, "penetra": false, "costo_ensamblaje": 5000}
+}
