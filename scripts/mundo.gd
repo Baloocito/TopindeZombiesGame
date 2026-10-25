@@ -181,6 +181,9 @@ var token_por_id: Dictionary = {}
 # y posición justo antes de caerse.
 var jugadores_desconectados: Dictionary = {}
 
+# id de red nuevo -> id lógico (nombre del nodo) de quien volvió a conectarse.
+var id_logico_por_id_red: Dictionary = {}
+
 func _on_peer_desconectado(id: int):
 	if not multiplayer.is_server(): return
 
@@ -243,6 +246,7 @@ func solicitar_sincronizacion_tardia(token: String):
 
 		if segundos_pasados <= VENTANA_GRACIA_SEGUNDOS and is_instance_valid(nodo_reclamado):
 			token_por_id[token] = id
+			id_logico_por_id_red[id] = id_logico
 			nodo_reclamado.set_multiplayer_authority(id)
 
 			EstadoPartida.informar_id_logico.rpc_id(id, id_logico)
@@ -665,6 +669,7 @@ func solicitar_reparacion_servidor():
 	if dinero_global >= costo and reparaciones_usadas < int(Balance.progresion["reparaciones_por_dia"]):
 		sumar_dinero(-costo)
 		ejecutar_reparacion_en_red.rpc()
+		_avisar_gasto("reparó la base", costo)
 
 @rpc("call_local", "reliable")
 func ejecutar_reparacion_en_red():
@@ -824,6 +829,7 @@ func solicitar_construccion(tipo: String, pos_llave: Vector3, pos_real: Vector3,
 	if _hay_alguien_en(pos_real): return
 
 	sumar_dinero(-costo_actual)
+	_avisar_gasto("construyó " + str(Balance.estructura(tipo)["nombre"]), costo_actual)
 	ejecutar_construccion_en_red.rpc(tipo, pos_llave, pos_real, mult_ing)
 
 @rpc("call_local", "reliable")
@@ -992,6 +998,7 @@ func solicitar_ensamblar(id_arma: String):
 	sumar_dinero(-costo)
 	quitar_plano_para_todos.rpc(id_arma)
 	confirmar_ensamblaje.rpc_id(_remitente(), id_arma)
+	_avisar_gasto("ensambló " + str(Balance.arma(id_arma)["nombre"]), costo)
 
 @rpc("authority", "call_local", "reliable")
 func confirmar_ensamblaje(id_arma: String):
@@ -1009,6 +1016,7 @@ func solicitar_mejora(id_arma: String):
 	sumar_dinero(-costo)
 	quitar_plano_para_todos.rpc(id_arma)
 	confirmar_mejora.rpc_id(_remitente(), id_arma)
+	_avisar_gasto("mejoró " + str(Balance.arma(id_arma)["nombre"]), costo)
 
 @rpc("authority", "call_local", "reliable")
 func confirmar_mejora(id_arma: String):
@@ -1025,3 +1033,55 @@ func confirmar_mejora(id_arma: String):
 		"tiempo_recarga": arma.tiempo_recarga = max(0.1, arma.tiempo_recarga * (1.0 - bono * 0.5))
 	jugador.actualizar_ui_municion()
 	_refrescar_menu_si_abierto(menu_ensamblaje, menus.actualizar_lista_ensamblaje)
+
+# ==========================================================
+# 11. AVISOS DE GASTO DEL ORO COMÚN
+# ==========================================================
+# El oro es de todo el equipo, así que cada gasto se anuncia en todas las
+# pantallas: "Jugador 2 construyó Valla Madera (−$150)".
+
+# Solo el servidor: arma el texto con quién gastó y lo reparte.
+func _avisar_gasto(accion: String, costo: int):
+	if not multiplayer.is_server(): return
+	var texto := "%s %s (−$%d)" % [_nombre_jugador(_remitente()), accion, costo]
+	mostrar_aviso.rpc(texto)
+
+func _nombre_jugador(id_red: int) -> String:
+	if id_red == 1: return "Anfitrión"
+	# El nombre del nodo es el id lógico; tras una reconexión el id de red
+	# cambia, así que lo buscamos por el token registrado.
+	var id_logico: int = id_logico_por_id_red.get(id_red, id_red)
+	var ids := []
+	for n in $ContenedorJugadores.get_children(): ids.append(n.name.to_int())
+	ids.sort()
+	var pos := ids.find(id_logico)
+	return "Jugador %d" % (pos + 1) if pos > 0 else "Un jugador"
+
+var _caja_avisos: VBoxContainer
+
+@rpc("authority", "call_local", "reliable")
+func mostrar_aviso(texto: String):
+	if not is_instance_valid(_caja_avisos):
+		_caja_avisos = VBoxContainer.new()
+		_caja_avisos.name = "Avisos"
+		_caja_avisos.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_caja_avisos.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		_caja_avisos.position = Vector2(-220, 96)
+		_caja_avisos.custom_minimum_size = Vector2(440, 0)
+		$InterfazUI.add_child(_caja_avisos)
+	var etiqueta := Label.new()
+	etiqueta.text = texto
+	etiqueta.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	etiqueta.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	etiqueta.add_theme_font_size_override("font_size", 20)
+	etiqueta.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	etiqueta.add_theme_color_override("font_outline_color", Color.BLACK)
+	etiqueta.add_theme_constant_override("outline_size", 6)
+	_caja_avisos.add_child(etiqueta)
+	# Máximo 3 avisos a la vez; el más viejo se va primero.
+	while _caja_avisos.get_child_count() > 3:
+		_caja_avisos.get_child(0).free()
+	var tween := etiqueta.create_tween()
+	tween.tween_interval(3.0)
+	tween.tween_property(etiqueta, "modulate:a", 0.0, 0.6)
+	tween.tween_callback(etiqueta.queue_free)
