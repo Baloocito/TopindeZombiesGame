@@ -180,14 +180,20 @@ func _on_btn_host_pressed():
 	# Partida nueva salvo que venga de "Continuar partida".
 	if not _continuando:
 		EstadoPartida.partida_a_cargar = {}
-	var error = peer.create_server(EstadoPartida.PUERTO_RED, MAX_CLIENTS)
-	if error != OK:
-		print("Error al crear el Host: ", error)
-		return
+	# Jugar solo no necesita red: con OfflineMultiplayerPeer el juego corre
+	# igual (somos el servidor, id 1) aunque el teléfono no tenga conexión o
+	# el sistema no deje abrir el puerto.
+	if cantidad_deseada <= 1:
+		multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	else:
+		var error = peer.create_server(EstadoPartida.PUERTO_RED, MAX_CLIENTS)
+		if error != OK:
+			_mostrar_error("No se pudo crear la sala (error %d).\nRevisa que el juego tenga permiso de red." % error)
+			return
+		multiplayer.multiplayer_peer = peer
 
 	soy_host = true
 	contrasena_sala = input_contrasena_crear.text
-	multiplayer.multiplayer_peer = peer
 	print("¡Servidor Host creado! Esperando a los muchachos... (sala de ", cantidad_deseada, ")")
 
 	# EL HOST SE REGISTRA A SÍ MISMO (El Host SIEMPRE es el ID 1)
@@ -208,7 +214,7 @@ func _on_btn_unirse_pressed():
 
 	var error = peer.create_client(ip, EstadoPartida.PUERTO_RED)
 	if error != OK:
-		print("Error al configurar el cliente: ", error)
+		_mostrar_error("No se pudo conectar (error %d).\nRevisa la IP y que el juego tenga permiso de red." % error)
 		return
 
 	multiplayer.multiplayer_peer = peer
@@ -265,7 +271,20 @@ func _on_conectado_al_servidor():
 
 func _on_falla_de_conexion():
 	print("Error de conexión. ¿El Host está activo?")
+	_mostrar_error("No se encontró la sala.\n¿El anfitrión ya la creó y están en la misma red?")
+	peer = ENetMultiplayerPeer.new()
+	multiplayer.multiplayer_peer = null
 	_mostrar_menu_conexion()
+
+# Los errores se muestran en pantalla (antes solo iban a la consola y en el
+# teléfono parecía que el botón no hacía nada).
+func _mostrar_error(texto: String):
+	push_warning(texto)
+	if label_estado_sala:
+		label_estado_sala.show()
+		label_estado_sala.text = texto
+		label_estado_sala.add_theme_color_override("font_color", Color("#ff8a7a"))
+		label_estado_sala.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 # El cliente le pide entrar al host, mandando la contraseña que escribió (si
 # la sala no tiene, cualquier valor -- incluso vacío -- sirve).
@@ -329,6 +348,7 @@ func actualizar_ui_lobby():
 
 func _actualizar_estado_sala():
 	label_estado_sala.show()
+	label_estado_sala.remove_theme_color_override("font_color")
 	label_estado_sala.text = "Sala: %d/%d jugadores" % [jugadores_conectados.size(), cantidad_deseada]
 
 	if soy_host:
