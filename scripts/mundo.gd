@@ -572,6 +572,8 @@ func iniciar_oleada_en_red():
 	fase_combate = true
 	modo_construccion = false
 	holograma.visible = false
+	if cuadricula_visual and cuadricula_visual.visible: animar_cuadricula(false)
+	_resaltar_construir(false)
 	cerrar_menu_lateral()
 	animar_fase("NOCHE ETERNA: OLEADA " + str(oleada_actual), Color(1, 0.2, 0.2))
 
@@ -822,6 +824,7 @@ func alternar_modo_construccion():
 func iniciar_colocacion_objeto(clave: String):
 	modo_construccion = true
 	objeto_seleccionado_tienda = clave
+	mostrar_aviso("Construyendo %s: toca una casilla y confírmala. Toca Construir para terminar." % Balance.estructura(clave).get("nombre", clave))
 
 	_resaltar_construir(true)
 	holograma.visible = false
@@ -855,11 +858,10 @@ func construir_estructura():
 	else:
 		solicitar_construccion.rpc_id(1, objeto_seleccionado_tienda, pos_llave, holograma.global_position, multiplicador_ingenieria)
 
+	# Se queda en modo construcción para seguir colocando piezas del mismo
+	# tipo. Se sale tocando otra vez el botón Construir (o al empezar la noche).
 	celda_previa_tocada = Vector3.INF
 	holograma.visible = false
-	animar_cuadricula(false)
-	modo_construccion = false
-	_resaltar_construir(false)
 
 @rpc("any_peer", "reliable")
 func solicitar_construccion(tipo: String, pos_llave: Vector3, pos_real: Vector3, mult_ing: float):

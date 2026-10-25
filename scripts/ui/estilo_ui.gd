@@ -24,8 +24,37 @@ static func preparar_boton_icono(boton: Button) -> void:
 	boton.focus_mode = Control.FOCUS_NONE
 	agregar_rebote(boton)
 
+# Pruebas: permite simular un teléfono en el PC o en modo consola.
+static var tactil_forzado := false
+
+static func es_tactil() -> bool:
+	return tactil_forzado or DisplayServer.is_touchscreen_available()
+
+# MULTITÁCTIL: los botones de Godot solo escuchan el "ratón" que el sistema
+# inventa a partir del PRIMER dedo. Si ese dedo ya está en un joystick, un
+# segundo dedo sobre "Recargar" o un arma no hacía nada. Aquí cada botón
+# escucha los toques directamente, sea el dedo que sea.
+static func hacer_multitactil(boton: BaseButton) -> void:
+	if boton.has_meta("multitactil"): return
+	boton.set_meta("multitactil", true)
+	boton.gui_input.connect(func(evento: InputEvent):
+		if not es_tactil(): return
+		if evento is InputEventScreenTouch:
+			if evento.pressed:
+				if not boton.disabled:
+					boton.button_down.emit()
+					boton.pressed.emit()
+			else:
+				boton.button_up.emit()
+			boton.accept_event()
+		elif evento is InputEventMouseButton:
+			# Ratón inventado del primer dedo: ya lo atendimos como toque.
+			boton.accept_event())
+
 # Pequeño "rebote" al tocar cualquier botón (se siente físico en táctil).
+# También lo deja multitáctil.
 static func agregar_rebote(boton: BaseButton) -> void:
+	hacer_multitactil(boton)
 	if boton.has_meta("con_rebote"): return
 	boton.set_meta("con_rebote", true)
 	boton.resized.connect(func(): boton.pivot_offset = boton.size / 2.0)
