@@ -17,6 +17,9 @@ properties/1/replication_mode = 1
 properties/2/path = NodePath(".:scale")
 properties/2/spawn = true
 properties/2/replication_mode = 2
+properties/3/path = NodePath(".:tipo_zombie")
+properties/3/spawn = true
+properties/3/replication_mode = 0
 
 [node name="zombie" type="CharacterBody3D" unique_id=1060371809 groups=["enemigos"]]
 collision_layer = 4

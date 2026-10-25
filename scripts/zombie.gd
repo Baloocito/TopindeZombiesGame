@@ -18,9 +18,11 @@ var dano_ataque_actual: int
 var dano_estructuras: int = 15
 const RADIO_EXPLOSION: float = 3.0
 
-# --- HABILIDADES DE JEFE ---
-var cooldown_habilidad: float = 5.0
-var temporizador_habilidad: float = 0.0
+# --- JEFES Y NODOS ---
+# Los jefes (y los nodos de energía del Hospedero) no usan la IA de abajo:
+# su cerebro es un nodo hijo (scripts/enemigos/*_ia.gd) que solo existe en el
+# servidor. Ver nacer().
+var ia: Node = null
 var esta_cargando_ataque: bool = false
 
 # --- ESTADOS INTERNOS ---
@@ -44,6 +46,49 @@ var _temporizador_ia: float = randf() * INTERVALO_IA
 func _ready():
 	# ¡VITAL! El ID 1 (Servidor) es el único dueño legítimo de todos los zombies
 	set_multiplayer_authority(1)
+	# tipo_zombie llega con el spawn: cada pantalla pinta el enemigo según su tipo.
+	_aplicar_aspecto.call_deferred()
+
+func _aplicar_aspecto():
+	var datos := Balance.zombie(tipo_zombie)
+	var modelo := get_node_or_null("zombie_run") as Node3D
+	if tipo_zombie == "nodo":
+		if modelo: modelo.visible = false
+		var cristal := MeshInstance3D.new()
+		var prisma := PrismMesh.new()
+		prisma.size = Vector3(0.9, 1.8, 0.9)
+		cristal.mesh = prisma
+		cristal.position = Vector3(0, 1.2, 0)
+		var mat_c := StandardMaterial3D.new()
+		mat_c.albedo_color = Color(datos.get("color", "#22d3ee"))
+		mat_c.emission_enabled = true
+		mat_c.emission = mat_c.albedo_color
+		mat_c.emission_energy_multiplier = 2.5
+		cristal.material_override = mat_c
+		add_child(cristal)
+		var giro := cristal.create_tween().set_loops()
+		giro.tween_property(cristal, "rotation:y", TAU, 2.0).from(0.0)
+		return
+	if not datos.has("color") or not modelo: return
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(datos["color"], 0.45)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for m in modelo.find_children("*", "MeshInstance3D", true, false):
+		(m as MeshInstance3D).material_overlay = mat
+	# La Mosca Titán lleva una placa al frente: la armadura que obliga a flanquear.
+	if tipo_zombie.begins_with("mosca_titan"):
+		var placa := MeshInstance3D.new()
+		var caja := BoxMesh.new()
+		caja.size = Vector3(0.85, 0.6, 0.1)
+		placa.mesh = caja
+		placa.position = Vector3(0, 1.0, -0.42)
+		var mat_p := StandardMaterial3D.new()
+		mat_p.albedo_color = Color("#cbd5e1")
+		mat_p.metallic = 0.8
+		mat_p.roughness = 0.3
+		placa.material_override = mat_p
+		add_child(placa)
 
 # ¡NUEVA FUNCIÓN COOPERATIVA! El zombie escanea quién está más cerca
 func buscar_presa_mas_cercana() -> Node3D:
@@ -77,15 +122,33 @@ func nacer(numero_oleada: int, costo: int, tipo: String = "basico"):
 	var escala := float(datos["escala"])
 	scale = Vector3.ONE * escala
 	rango_ataque = 1.2 * escala
-	velocidad = Balance.escalar_velocidad(float(datos["velocidad"]), numero_oleada)
-	if tipo == "boss":
-		var jugadores := maxi(1, get_tree().get_nodes_in_group("jugador").size())
-		salud_maxima = Balance.vida_jefe(numero_oleada, jugadores)
+	velocidad = Balance.escalar_velocidad(float(datos["velocidad"]), numero_oleada) * Balance.velocidad_noche(numero_oleada)
+	var jugadores := maxi(1, get_tree().get_nodes_in_group("jugador").size())
+	if Balance.es_jefe(tipo):
+		salud_maxima = int(Balance.vida_jefe(numero_oleada, jugadores) * float(datos.get("fraccion_vida", 1.0)))
+	elif tipo == "nodo":
+		salud_maxima = int(Balance.dps_esperado(numero_oleada) * float(datos.get("segundos_de_vida", 2.5)))
 	else:
 		salud_maxima = Balance.escalar_vida(float(datos["vida"]), numero_oleada)
 	salud_actual = salud_maxima
-	dano_ataque_actual = Balance.escalar_dano(float(datos["dano"]), numero_oleada)
-	dano_estructuras = Balance.escalar_dano(float(datos["dano_estructuras"]), numero_oleada)
+	var furia := Balance.furia_noche(numero_oleada)
+	dano_ataque_actual = int(Balance.escalar_dano(float(datos["dano"]), numero_oleada) * furia)
+	dano_estructuras = int(Balance.escalar_dano(float(datos["dano_estructuras"]), numero_oleada) * furia)
+
+	# Cerebro de jefe (solo servidor: los clientes solo ven moverse al modelo).
+	if multiplayer.is_server():
+		var script_ia: Script = null
+		match tipo:
+			"mosca_titan", "mosca_titan_plus": script_ia = load("res://scripts/enemigos/mosca_titan_ia.gd")
+			"guardian": script_ia = load("res://scripts/enemigos/guardian_ia.gd")
+			"acechador": script_ia = load("res://scripts/enemigos/acechador_ia.gd")
+			"hospedero": script_ia = load("res://scripts/enemigos/hospedero_ia.gd")
+			"nodo": script_ia = load("res://scripts/enemigos/nodo_ia.gd")
+		if script_ia:
+			ia = script_ia.new()
+			ia.name = "IA"
+			add_child(ia)
+			ia.iniciar(self, numero_oleada, jugadores)
 
 func _physics_process(delta):
 	# ¡FILTRO DE RED! Solo la máquina del Host calcula dónde camina el zombie.
@@ -98,6 +161,11 @@ func _physics_process(delta):
 
 	if not is_on_floor():
 		velocity.y -= gravedad * delta
+
+	if ia:
+		ia.procesar(delta)
+		move_and_slide()
+		return
 
 	if esta_cargando_ataque:
 		detener_movimiento()
@@ -141,12 +209,6 @@ func _physics_process(delta):
 	move_and_slide()
 	revisar_colisiones()
 
-	if tipo_zombie == "boss" and is_instance_valid(jugador_objetivo):
-		temporizador_habilidad -= delta
-		if temporizador_habilidad <= 0.0 and global_position.distance_to(jugador_objetivo.global_position) <= 8.0:
-			iniciar_golpe_sismico()
-			temporizador_habilidad = cooldown_habilidad
-
 func detener_movimiento():
 	velocity.x = move_toward(velocity.x, 0, velocidad)
 	velocity.z = move_toward(velocity.z, 0, velocidad)
@@ -175,34 +237,6 @@ func revisar_colisiones():
 		if objeto_chocado and objeto_chocado.is_in_group("barricadas") and puede_atacar:
 			atacar(objeto_chocado)
 
-func iniciar_golpe_sismico():
-	esta_cargando_ataque = true
-	var tween = create_tween()
-	tween.tween_property(self, "scale", Vector3(3.0, 3.0, 3.0), 1.0)
-
-	await get_tree().create_timer(1.0).timeout
-
-	if not is_instance_valid(self) or esta_muerto: return
-
-	ejecutar_golpe_sismico()
-	scale = Vector3(2.5, 2.5, 2.5)
-	esta_cargando_ataque = false
-
-func ejecutar_golpe_sismico():
-	var radio_impacto = 6.0
-	var dano_habilidad = int(dano_ataque_actual * 1.5)
-
-	# --- FIX (revisión de código) --- misma razón que en atacar()
-	if is_instance_valid(jugador_objetivo) and global_position.distance_to(jugador_objetivo.global_position) <= radio_impacto:
-		if jugador_objetivo.has_method("recibir_dano_en_red"): jugador_objetivo.recibir_dano_en_red.rpc(dano_habilidad)
-
-	# Las barricadas SÍ son autoridad del servidor por defecto, así que la
-	# llamada directa está bien acá — no hace falta RPC.
-	var barricadas = get_tree().get_nodes_in_group("barricadas")
-	for defensa in barricadas:
-		if is_instance_valid(defensa) and global_position.distance_to(defensa.global_position) <= radio_impacto:
-			if defensa.has_method("recibir_dano"): defensa.recibir_dano(dano_habilidad)
-
 func explotar():
 	puede_atacar = false
 	if is_instance_valid(jugador_objetivo) and jugador_objetivo.has_method("recibir_dano_en_red"):
@@ -217,20 +251,32 @@ func explotar():
 func recibir_dano_en_red(cantidad: int):
 	recibir_dano(cantidad)
 
-func recibir_dano(cantidad: int):
+# Igual que recibir_dano_en_red, con la dirección de la bala: la usan los
+# jefes con armadura (la Mosca Titán resiste lo que le pega de frente).
+@rpc("any_peer", "call_local", "reliable")
+func recibir_impacto_en_red(cantidad: int, direccion: Vector3):
+	recibir_dano(cantidad, direccion)
+
+func recibir_dano(cantidad: int, direccion: Vector3 = Vector3.ZERO):
 	# ¡FILTRO DE RED CRÍTICO! Las balas existen en ambas pantallas, pero
 	# solo el Servidor descuenta la vida, registra la muerte y suelta el oro.
 	if not multiplayer.is_server(): return
 
 	if esta_muerto: return
 
+	if ia:
+		cantidad = ia.modificar_dano(cantidad, direccion)
+		if cantidad <= 0: return
+
 	salud_actual -= cantidad
+	if ia: ia.al_recibir_dano(cantidad)
 
 	if salud_actual <= 0:
 		esta_muerto = true
 
 		var mundo = get_parent()
-		if is_instance_valid(mundo):
+		if ia: ia.al_morir()
+		if is_instance_valid(mundo) and tipo_zombie != "nodo":
 			if mundo.has_method("zombie_eliminado"): mundo.zombie_eliminado()
 			if mundo.has_method("spawn_loot"): mundo.spawn_loot(global_position, tipo_zombie)
 

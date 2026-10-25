@@ -1,0 +1,33 @@
+{
+  "_nota": "Las 20 noches de la campaña, diseñadas una por una. presupuesto es para 1 jugador (se multiplica por 1 + 0,6·(p−1)); simultaneos se multiplica por 1 + 0,25·(p−1) con tope 70. mezcla son pesos relativos para elegir zombies. pulsos: en cuántas oleadas se divide la noche (entre una y otra hay un respiro). furia multiplica el daño enemigo y velocidad su rapidez. jefe_en_pulso: antes de qué pulso entra el jefe (0 = al empezar).",
+  "respiro_entre_pulsos": 7.0,
+  "noches": [
+    {"n": 1,  "nombre": "La Primera Noche", "lema": "Aprende a respirar.",            "presupuesto": 80,   "pulsos": 1, "simultaneos": 10, "intervalo": 1.6,  "mezcla": {"basico": 1}},
+    {"n": 2,  "nombre": "Hambre",           "lema": "Vienen más de los que crees.",    "presupuesto": 120,  "pulsos": 2, "simultaneos": 12, "intervalo": 1.4,  "mezcla": {"basico": 1}},
+    {"n": 3,  "nombre": "Pies Ligeros",     "lema": "Algunos corren.",                 "presupuesto": 170,  "pulsos": 2, "simultaneos": 14, "intervalo": 1.3,  "mezcla": {"basico": 4, "corredor": 2}},
+    {"n": 4,  "nombre": "Sin Respiro",      "lema": "No dejes de moverte.",            "presupuesto": 230,  "pulsos": 3, "simultaneos": 16, "intervalo": 1.15, "mezcla": {"basico": 3, "corredor": 3}},
+    {"n": 5,  "nombre": "El Zumbido",       "lema": "Algo grande se acerca.",          "presupuesto": 130,  "pulsos": 2, "simultaneos": 14, "intervalo": 1.2,  "mezcla": {"basico": 3, "corredor": 2}, "jefe": "mosca_titan", "jefe_en_pulso": 0},
+    {"n": 6,  "nombre": "Carne de Hierro",  "lema": "Hay cosas que no caen rápido.",   "presupuesto": 310,  "pulsos": 3, "simultaneos": 18, "intervalo": 1.0,  "mezcla": {"basico": 4, "corredor": 2, "tanque": 1}},
+    {"n": 7,  "nombre": "La Estampida",     "lema": "Escucha el suelo temblar.",       "presupuesto": 370,  "pulsos": 2, "simultaneos": 22, "intervalo": 0.45, "mezcla": {"basico": 2, "corredor": 6}},
+    {"n": 8,  "nombre": "Pólvora",          "lema": "Tus muros no son eternos.",       "presupuesto": 440,  "pulsos": 3, "simultaneos": 24, "intervalo": 0.9,  "mezcla": {"basico": 3, "corredor": 2, "explosivo": 2, "tanque": 1}},
+    {"n": 9,  "nombre": "Asedio",           "lema": "Rodean la base.",                 "presupuesto": 530,  "pulsos": 4, "simultaneos": 26, "intervalo": 0.8,  "mezcla": {"basico": 3, "corredor": 2, "explosivo": 2, "tanque": 2}},
+    {"n": 10, "nombre": "El Enjambre",      "lema": "Cazan en manada.",                "presupuesto": 280,  "pulsos": 2, "simultaneos": 22, "intervalo": 0.8,  "mezcla": {"basico": 2, "corredor": 4}, "jefe": "enjambre", "jefe_en_pulso": 0},
+    {"n": 11, "nombre": "Muro de Carne",    "lema": "Lentos. Imparables.",             "presupuesto": 660,  "pulsos": 3, "simultaneos": 30, "intervalo": 0.75, "mezcla": {"basico": 3, "tanque": 3, "explosivo": 1}, "furia": 1.05},
+    {"n": 12, "nombre": "Lluvia de Fuego",  "lema": "Nada queda en pie.",              "presupuesto": 740,  "pulsos": 3, "simultaneos": 32, "intervalo": 0.7,  "mezcla": {"basico": 2, "corredor": 2, "explosivo": 4}, "furia": 1.05},
+    {"n": 13, "nombre": "Todos a la Vez",   "lema": "Ya no hay orden.",                "presupuesto": 850,  "pulsos": 2, "simultaneos": 36, "intervalo": 0.55, "mezcla": {"basico": 3, "corredor": 3, "explosivo": 2, "tanque": 2}, "furia": 1.1},
+    {"n": 14, "nombre": "Sin Luz",          "lema": "Cuenta tus balas.",               "presupuesto": 970,  "pulsos": 4, "simultaneos": 38, "intervalo": 0.6,  "mezcla": {"basico": 3, "corredor": 3, "explosivo": 2, "tanque": 2}, "furia": 1.1},
+    {"n": 15, "nombre": "El Despertar",     "lema": "Volvió. Y aprendió.",             "presupuesto": 480,  "pulsos": 3, "simultaneos": 30, "intervalo": 0.65, "mezcla": {"basico": 3, "corredor": 3, "explosivo": 1, "tanque": 1}, "jefe": "mosca_titan_plus", "jefe_en_pulso": 0, "furia": 1.1},
+    {"n": 16, "nombre": "El Principio del Fin", "lema": "Desde aquí, nadie vuelve.",   "presupuesto": 1400, "pulsos": 4, "simultaneos": 44, "intervalo": 0.5,  "mezcla": {"basico": 3, "corredor": 3, "explosivo": 2, "tanque": 2}, "furia": 1.15, "velocidad": 1.05},
+    {"n": 17, "nombre": "Marea",            "lema": "Una ola detrás de otra.",         "presupuesto": 1650, "pulsos": 5, "simultaneos": 48, "intervalo": 0.4,  "mezcla": {"basico": 2, "corredor": 5, "explosivo": 2, "tanque": 1}, "furia": 1.15, "velocidad": 1.05},
+    {"n": 18, "nombre": "Luna de Sangre",   "lema": "Están furiosos.",                 "presupuesto": 1950, "pulsos": 4, "simultaneos": 52, "intervalo": 0.4,  "mezcla": {"basico": 3, "corredor": 3, "explosivo": 2, "tanque": 2}, "furia": 1.25, "velocidad": 1.1},
+    {"n": 19, "nombre": "La Víspera",       "lema": "Mañana no existe.",               "presupuesto": 2300, "pulsos": 4, "simultaneos": 56, "intervalo": 0.35, "mezcla": {"basico": 2, "corredor": 2, "explosivo": 3, "tanque": 3}, "furia": 1.25, "velocidad": 1.1},
+    {"n": 20, "nombre": "La Última Noche",  "lema": "El Hospedero despierta.",         "presupuesto": 2100, "pulsos": 4, "simultaneos": 50, "intervalo": 0.4,  "mezcla": {"basico": 3, "corredor": 3, "explosivo": 2, "tanque": 2}, "jefe": "hospedero", "jefe_en_pulso": 1, "furia": 1.25, "velocidad": 1.1}
+  ],
+  "eternas": {
+    "_nota": "Noches 21+: parten de la noche 20 y crecen sin tope. Jefe cada 5 noches, rotando.",
+    "presupuesto_por_noche": 0.15,
+    "simultaneos_por_noche": 1,
+    "furia_por_noche": 0.03,
+    "jefes": ["mosca_titan_plus", "enjambre", "mosca_titan_plus", "hospedero"]
+  }
+}

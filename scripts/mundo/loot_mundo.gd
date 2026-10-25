@@ -19,7 +19,7 @@ func spawn_loot(pos_muerte: Vector3, tipo_zombie: String):
 	m.sumar_dinero(int(datos["oro_bounty"]))
 	m.dar_experiencia_equipo.rpc(Balance.xp_por_baja(tipo_zombie, jugadores))
 
-	var es_elite := tipo_zombie == "tanque" or tipo_zombie == "boss"
+	var es_elite := tipo_zombie == "tanque" or Balance.es_jefe(tipo_zombie)
 	var umbral_municion := float(Balance.loot("umbral_municion"))
 	var umbral_botiquin := float(Balance.loot("umbral_botiquin"))
 	var umbral_plano := float(Balance.loot("umbral_plano"))

@@ -149,6 +149,10 @@ func _physics_process(delta: float) -> void:
 
 		var input_dir := Input.get_vector("mover_izq", "mover_der", "mover_arriba", "mover_abajo")
 		var direction := Vector3(input_dir.x, 0, input_dir.y).normalized()
+		# Atado por el Hospedero: no camina (pero puede apuntar y disparar).
+		if atado:
+			direction = Vector3.ZERO
+			_procesar_atadura(delta)
 
 		if direction:
 			velocity.x = direction.x * stat_agilidad
@@ -422,6 +426,8 @@ func recibir_dano(cantidad: int):
 func quedar_derribado():
 	esta_caido = true
 	salud_actual = 0
+	atado = false
+	_mostrar_atadura(false)
 	actualizar_ui_vida()
 
 	# --- FIX (revisión de código) ---
@@ -479,6 +485,85 @@ func reconectar_en_red(salud_restaurada: int, posicion_restaurada: Vector3):
 	global_position = posicion_restaurada
 	scale = Vector3(1.0, 1.0, 1.0)
 	actualizar_ui_vida()
+
+# ==========================================================
+# ATADURAS DEL HOSPEDERO (noche 20, fase 2)
+# ==========================================================
+# El servidor ata a quien quedó dentro del círculo. Solo: te liberas solo a
+# los `duracion` segundos. Coop: solo te libera un compañero que se quede a
+# menos de 2 m durante 1 s (o, como último recurso, a los 10 s). Mientras
+# estás atado pierdes un 5 % de vida por segundo.
+const RADIO_LIBERAR := 2.0
+var atado := false
+var _atado_requiere_ayuda := false
+var _t_atado := 0.0
+var _t_ayuda := 0.0
+var _t_dano_atado := 0.0
+
+@rpc("any_peer", "call_local", "reliable")
+func atar_en_red(duracion: float, requiere_ayuda: bool):
+	var remitente = multiplayer.get_remote_sender_id()
+	if remitente != 0 and remitente != 1: return
+	if esta_caido: return
+	atado = true
+	_atado_requiere_ayuda = requiere_ayuda
+	_t_atado = 10.0 if requiere_ayuda else duracion
+	_t_ayuda = 0.0
+	_t_dano_atado = 1.0
+	_mostrar_atadura(true)
+	if is_multiplayer_authority():
+		var mundo = get_parent().get_parent()
+		if mundo.has_method("mostrar_aviso"):
+			mundo.mostrar_aviso("¡Atado! Un compañero debe acercarse para liberarte." if requiere_ayuda else "¡Atado! Aguanta 3 segundos…")
+
+@rpc("any_peer", "call_local", "reliable")
+func liberar_atadura_en_red():
+	var remitente = multiplayer.get_remote_sender_id()
+	if remitente != 0 and remitente != 1 and remitente != get_multiplayer_authority(): return
+	atado = false
+	_mostrar_atadura(false)
+
+func _procesar_atadura(delta: float):
+	_t_atado -= delta
+	_t_dano_atado -= delta
+	if _t_dano_atado <= 0.0:
+		_t_dano_atado = 1.0
+		recibir_dano(maxi(1, int(stat_salud_maxima * 0.05)))
+	if _atado_requiere_ayuda:
+		var cerca := false
+		for jug in get_tree().get_nodes_in_group("jugador"):
+			if jug == self or not is_instance_valid(jug) or jug.esta_caido: continue
+			if "atado" in jug and jug.atado: continue
+			if global_position.distance_to(jug.global_position) <= RADIO_LIBERAR:
+				cerca = true
+				break
+		_t_ayuda = _t_ayuda + delta if cerca else 0.0
+	if _t_atado <= 0.0 or _t_ayuda >= 1.0:
+		liberar_atadura_en_red.rpc()
+
+func _mostrar_atadura(activa: bool):
+	var anillo := get_node_or_null("Atadura")
+	if not activa:
+		if anillo: anillo.queue_free()
+		return
+	if anillo: return
+	anillo = MeshInstance3D.new()
+	anillo.name = "Atadura"
+	var toro := TorusMesh.new()
+	toro.inner_radius = 0.55
+	toro.outer_radius = 0.75
+	anillo.mesh = toro
+	anillo.position = Vector3(0, 0.6, 0)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.7, 0.3, 1.0)
+	mat.emission_enabled = true
+	mat.emission = Color(0.7, 0.3, 1.0)
+	mat.emission_energy_multiplier = 2.0
+	anillo.material_override = mat
+	add_child(anillo)
+	var t := anillo.create_tween().set_loops()
+	t.tween_property(anillo, "position:y", 1.3, 0.5)
+	t.tween_property(anillo, "position:y", 0.4, 0.5)
 
 # Busca, entre los jugadores vivos, si hay alguno derribado a corta
 # distancia (para la reanimación por proximidad).

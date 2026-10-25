@@ -51,8 +51,11 @@ func _al_chocar(cuerpo: Node3D):
 
 	# --- IMPACTO DE GUERRA ---
 	if cuerpo.is_in_group("enemigos"):
-		if es_bala_propia and cuerpo.has_method("recibir_dano_en_red"):
-			cuerpo.recibir_dano_en_red.rpc(dano)
+		if es_bala_propia:
+			if cuerpo.has_method("recibir_impacto_en_red"):
+				cuerpo.recibir_impacto_en_red.rpc(dano, transform.basis.z)
+			elif cuerpo.has_method("recibir_dano_en_red"):
+				cuerpo.recibir_dano_en_red.rpc(dano)
 
 	# La bala se destruye al impactar un enemigo, un muro del mapa o el suelo
 	queue_free()

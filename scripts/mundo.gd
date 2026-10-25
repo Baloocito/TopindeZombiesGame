@@ -91,6 +91,8 @@ var tween_fase: Tween
 # Módulos separados de este script (se crean en _ready).
 var menus: MenusMundo
 var loot: LootMundo
+var jefes: JefesMundo
+var campana: CampanaMundo
 
 # ==========================================================
 # 3.5. LÓGICA DE MULTIJUGADOR Y BÚSQUEDA LOCAL
@@ -362,7 +364,7 @@ func sincronizar_jugador_tardio(oleada: int, dinero: int, en_combate: bool):
 		actualizar_boton_reparacion()
 
 	if en_combate:
-		animar_fase("TE UNISTE A LA NOCHE " + str(oleada_actual), Color(1, 0.4, 0.4))
+		animar_fase("TE UNISTE: " + campana.titulo_noche(oleada_actual), Color(1, 0.4, 0.4))
 	else:
 		animar_fase("DÍA " + str(oleada_actual) + ": PREPÁRATE", Color.WHITE)
 
@@ -400,6 +402,14 @@ func _ready():
 	loot.name = "Loot"
 	loot.m = self
 	add_child(loot)
+	jefes = JefesMundo.new()
+	jefes.name = "Jefes"
+	jefes.m = self
+	add_child(jefes)
+	campana = CampanaMundo.new()
+	campana.name = "Campana"
+	campana.m = self
+	add_child(campana)
 	$InterfazUI.add_child(MedidorRendimiento.new())
 
 	holograma.visible = false
@@ -555,6 +565,7 @@ func fase_preparacion_en_red(nueva_oleada: int, dar_bono: bool = true):
 		_reportar_mi_estado()
 
 	animar_fase("DÍA " + str(oleada_actual) + ": PREPÁRATE", Color.WHITE)
+	_avisar_proxima_noche()
 	cambiar_fase_ui(false)
 
 	reparaciones_usadas = 0
@@ -575,7 +586,8 @@ func iniciar_oleada_en_red():
 	if cuadricula_visual and cuadricula_visual.visible: animar_cuadricula(false)
 	_resaltar_construir(false)
 	cerrar_menu_lateral()
-	animar_fase("NOCHE ETERNA: OLEADA " + str(oleada_actual), Color(1, 0.2, 0.2))
+	animar_fase(campana.titulo_noche(oleada_actual), Color(1, 0.2, 0.2))
+	mostrar_aviso(campana.lema_noche(oleada_actual))
 
 	cambiar_fase_ui(true)
 	if boton_reparar: boton_reparar.visible = false
@@ -744,9 +756,30 @@ func zombie_eliminado():
 
 	zombies_vivos -= 1
 	if zombies_vivos <= 0:
+		# La noche 20 cierra la campaña: victoria en vez de un día más.
+		if oleada_actual == Balance.noches_campana():
+			campana.ganar_campana()
+			return
 		oleada_actual += 1
 		# Pasamos a la siguiente fase para todos
 		fase_preparacion_en_red.rpc(oleada_actual)
+
+# Lo llama el director de horda cuando entra un jefe.
+func anunciar_jefe(tipo: String):
+	if not multiplayer.is_server(): return
+	var nombre := "EL ENJAMBRE" if tipo in ["guardian", "acechador"] else Balance.nombre_enemigo(tipo).to_upper()
+	anunciar_jefe_en_red.rpc(nombre)
+
+@rpc("authority", "call_local", "reliable")
+func anunciar_jefe_en_red(nombre: String):
+	animar_fase("JEFE: " + nombre, Color(0.85, 0.35, 1.0))
+
+func _avisar_proxima_noche():
+	var d := Balance.noche_campana(oleada_actual)
+	if d.has("jefe"):
+		mostrar_aviso("Esta noche viene un jefe. Prepárate bien.")
+	elif oleada_actual == Balance.noches_campana() - 1:
+		mostrar_aviso("Mañana es la última noche.")
 
 @rpc("call_local", "reliable")
 func actualizar_ui_zombies(asesinados: int):
@@ -1116,7 +1149,7 @@ func mostrar_aviso(texto: String):
 		_caja_avisos.name = "Avisos"
 		_caja_avisos.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_caja_avisos.set_anchors_preset(Control.PRESET_CENTER_TOP)
-		_caja_avisos.position = Vector2(-220, 96)
+		_caja_avisos.position = Vector2(-220, 142)  # debajo de la barra de jefe
 		_caja_avisos.custom_minimum_size = Vector2(440, 0)
 		$InterfazUI.add_child(_caja_avisos)
 	var etiqueta := Label.new()

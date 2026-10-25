@@ -4,6 +4,7 @@ const RUTA_GUARDADO = "user://datos_topingames.save"
 
 var record_oleada: int = 1
 var zombies_totales: int = 0
+var campanas_completadas: int = 0
 
 func _ready():
 	# Apenas se abre el juego, intentamos leer la memoria del celular/PC
@@ -15,7 +16,8 @@ func guardar_datos():
 	# Empaquetamos todo en un objeto fácil de leer
 	var datos = {
 		"record_oleada": record_oleada,
-		"zombies_totales": zombies_totales
+		"zombies_totales": zombies_totales,
+		"campanas_completadas": campanas_completadas
 	}
 	
 	# Lo transformamos a un string JSON y lo escribimos en el disco duro
@@ -43,6 +45,7 @@ func cargar_datos():
 			# El segundo parámetro (1 y 0) es el valor por defecto por si falla
 			record_oleada = datos_recuperados.get("record_oleada", 1)
 			zombies_totales = datos_recuperados.get("zombies_totales", 0)
+			campanas_completadas = int(datos_recuperados.get("campanas_completadas", 0))
 			print("¡Datos Cargados! Récord: Día ", record_oleada)
 
 # ==========================================================
