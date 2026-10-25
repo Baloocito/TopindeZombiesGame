@@ -27,8 +27,17 @@ func _limpiar(contenedor: Control):
 		contenedor.child_entered_tree.connect(_al_agregar_hijo)
 
 func _al_agregar_hijo(nodo: Node):
-	if nodo is BaseButton: EstiloUI.agregar_rebote(nodo)
-	for b in nodo.find_children("*", "BaseButton", true, false): EstiloUI.agregar_rebote(b)
+	var botones: Array = nodo.find_children("*", "Button", true, false)
+	if nodo is Button: botones.append(nodo)
+	for b in botones:
+		EstiloUI.agregar_rebote(b)
+		# Estilo vidrio por defecto dentro del panel (se aplica al cuadro
+		# siguiente, cuando el menú ya eligió una variante propia si la tiene).
+		_estilo_opcion.call_deferred(b)
+
+func _estilo_opcion(b: Button):
+	if is_instance_valid(b) and b.theme_type_variation == &"":
+		b.theme_type_variation = &"OpcionVidrio"
 
 func _espacio(contenedor: Control, alto: int):
 	var espacio = Control.new()
@@ -63,7 +72,7 @@ func actualizar_lista_armeria():
 			btn_slot.text = str(i + 1)
 			btn_slot.custom_minimum_size = Vector2(45, 45)
 			if jugador.armas_equipadas[i] == arma:
-				btn_slot.theme_type_variation = &"BotonPrimario"
+				btn_slot.theme_type_variation = &"OpcionPrimaria"
 			btn_slot.pressed.connect(func():
 				jugador.equipar_en_slot(arma, i)
 				if jugador.slot_actual == i: jugador.cambiar_arma(i)
@@ -276,12 +285,12 @@ func actualizar_lista_ensamblaje():
 		btn.custom_minimum_size = Vector2(0, 50)
 		if not arma_poseida:
 			btn.text = "Ensamblar\n$" + str(costo_ensamblar)
-			btn.theme_type_variation = &"BotonPrimario"
+			btn.theme_type_variation = &"OpcionPrimaria"
 			btn.disabled = m.dinero_global < costo_ensamblar
 			btn.pressed.connect(func(): m.pedir_ensamblar(clave))
 		else:
 			btn.text = "Forjar Mejora Aleatoria\n$" + str(costo_mejorar)
-			btn.theme_type_variation = &"BotonPrimario"
+			btn.theme_type_variation = &"OpcionPrimaria"
 			btn.disabled = m.dinero_global < costo_mejorar
 			btn.pressed.connect(func(): m.pedir_mejora(clave))
 		menu.add_child(btn)

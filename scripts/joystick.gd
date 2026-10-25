@@ -22,6 +22,7 @@ extends TextureRect
 # Evita que el tiro "tartamudee" cuando el pulgar tiembla justo en el borde del anillo.
 @export var umbral_soltar: float = 0.5
 const ACCION_DISPARO := "disparar_tactil"
+const COLOR_DISPARO := Color(1.0, 0.6, 0.25)
 
 enum LadoPantalla { IZQUIERDA, DERECHA }
 @export_category("Configuración Flotante")
@@ -37,9 +38,10 @@ var disparando: bool = false
 func _ready():
 	centro_real = Vector2(radio_base, radio_base)
 	palanca.anchors_preset = Control.PRESET_TOP_LEFT
+	_aplicar_estilo()
 	
 	visible = false
-	modulate.a = 0.6 
+	modulate.a = 1.0
 	if not InputMap.has_action(ACCION_DISPARO):
 		InputMap.add_action(ACCION_DISPARO)
 	call_deferred("resetear_joystick")
@@ -131,7 +133,7 @@ func actualizar_joystick(pos_global_dedo: Vector2):
 			disparando = true
 		elif ratio < umbral_soltar:
 			disparando = false
-		palanca.modulate = Color(1, 0.2, 0.2) if disparando else Color.WHITE
+		palanca.modulate = COLOR_DISPARO if disparando else Color.WHITE
 		_aplicar_disparo()
 		
 	palanca.position = centro_real + direccion - Vector2(radio_palanca, radio_palanca)
@@ -178,3 +180,55 @@ func _procesar_eje(accion_positiva: String, accion_negativa: String, valor: floa
 	else:
 		Input.action_release(accion_positiva)
 		Input.action_release(accion_negativa)
+
+# ==========================================================
+# 5. ESTILO: anillos finos generados por código
+# ==========================================================
+# Sin texturas: se dibujan con degradados, así se ven nítidos en cualquier
+# pantalla. Base = anillo fino con un leve relleno; palanca = disco suave;
+# anillo de disparo = anillo naranja en el umbral (solo joystick derecho).
+func _aplicar_estilo():
+	expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	stretch_mode = TextureRect.STRETCH_SCALE
+	texture = _anillo(Color(1, 1, 1, 0.5), 0.035, 0.07)
+	size = Vector2.ONE * radio_base * 2.0
+	palanca.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	palanca.stretch_mode = TextureRect.STRETCH_SCALE
+	palanca.texture = _disco(Color(1, 1, 1, 0.85))
+	palanca.scale = Vector2.ONE
+	palanca.size = Vector2.ONE * radio_palanca * 2.0
+	palanca.position = centro_real - Vector2(radio_palanca, radio_palanca)
+	var anillo := get_node_or_null("AnilloFuego") as TextureRect
+	if anillo:
+		anillo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		anillo.stretch_mode = TextureRect.STRETCH_SCALE
+		anillo.texture = _anillo(Color(1.0, 0.6, 0.25, 0.75), 0.05, 0.0)
+		anillo.modulate = Color.WHITE
+		anillo.size = Vector2.ONE * radio_base * 2.0 * umbral_disparo
+		anillo.position = centro_real - anillo.size / 2.0
+	# El contenedor de la escena venía semitransparente; la transparencia ya
+	# está en los degradados.
+	var padre := get_parent() as CanvasItem
+	if padre: padre.modulate = Color(1, 1, 1, 0.9)
+
+func _degradado(offsets: Array, colores: Array) -> GradientTexture2D:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array(offsets)
+	g.colors = PackedColorArray(colores)
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.fill = GradientTexture2D.FILL_RADIAL
+	t.fill_from = Vector2(0.5, 0.5)
+	t.fill_to = Vector2(1.0, 0.5)
+	t.width = 256
+	t.height = 256
+	return t
+
+func _anillo(color: Color, grosor: float, relleno: float) -> GradientTexture2D:
+	var dentro := Color(color, relleno)
+	var fuera := Color(color, 0.0)
+	return _degradado([0.0, 0.97 - grosor - 0.02, 0.97 - grosor, 0.965, 0.995],
+		[dentro, dentro, color, color, fuera])
+
+func _disco(color: Color) -> GradientTexture2D:
+	return _degradado([0.0, 0.8, 0.93, 1.0], [color, color, Color(color, 0.25), Color(color, 0.0)])

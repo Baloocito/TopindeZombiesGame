@@ -42,12 +42,13 @@ var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 
 # --- REFERENCIAS UI GENERALES ---
 # --- REFERENCIAS UI GENERALES ---
-@onready var lbl_salud_num = $"../../InterfazUI/HudSuperiorIzquierdo/HudEstadisticas/FilaSalud/LblSaludNum"
-@onready var barra_salud = $"../../InterfazUI/HudSuperiorIzquierdo/HudEstadisticas/BarraSalud"
-@onready var lbl_nivel = $"../../InterfazUI/HudSuperiorIzquierdo/HudEstadisticas/LblNivel"
-@onready var barra_xp = $"../../InterfazUI/HudSuperiorIzquierdo/HudEstadisticas/BarraXP"
+@onready var lbl_salud_num = $"../../InterfazUI/HudSuperiorIzquierdo/TarjetaJugador/Fila/HudEstadisticas/FilaSalud/LblSaludNum"
+@onready var barra_salud = $"../../InterfazUI/HudSuperiorIzquierdo/TarjetaJugador/Fila/HudEstadisticas/BarraSalud"
+@onready var lbl_nivel = $"../../InterfazUI/HudSuperiorIzquierdo/TarjetaJugador/Fila/HudEstadisticas/LblNivel"
+@onready var barra_xp = $"../../InterfazUI/HudSuperiorIzquierdo/TarjetaJugador/Fila/HudEstadisticas/BarraXP"
 @onready var panel_nivel_up = $"../../InterfazUI/ContenedorAlertas/PanelNivelUp"
 @onready var lbl_puntos_mejora = $"../../InterfazUI/ContenedorAlertas/PanelNivelUp/LblPuntos"
+@onready var boton_nivel_hud = get_node_or_null("../../InterfazUI/HudSuperiorIzquierdo/TarjetaJugador/Fila/BotonNivel")
 
 # --- REFERENCIAS UI INVENTARIO DE COMBATE ---
 @onready var slots_ui: Array = [
@@ -320,7 +321,10 @@ func actualizar_ui_xp():
 
 	if lbl_nivel and barra_xp:
 		var xp_necesaria = Balance.xp_para_nivel(nivel)
-		lbl_nivel.text = "NIVEL %s" % nivel
+		lbl_nivel.text = "NIVEL %s" % nivel + ("   +%d puntos" % puntos_mejora if puntos_mejora > 0 else "")
+		# El botón de nivel se pinta de naranja si hay puntos sin gastar.
+		if boton_nivel_hud:
+			boton_nivel_hud.modulate = Color(1.0, 0.72, 0.45) if puntos_mejora > 0 else Color.WHITE
 		barra_xp.max_value = xp_necesaria
 		var tween = create_tween()
 		tween.tween_property(barra_xp, "value", float(experiencia_actual), 0.2).set_trans(Tween.TRANS_SINE)
@@ -346,18 +350,18 @@ func actualizar_ui_municion():
 
 			if lbl_balas:
 				if esta_recargando and i == slot_actual:
-					lbl_balas.text = "RECARGANDO..."
+					lbl_balas.text = "Recargando…"
 				else:
 					lbl_balas.text = str(balas_render) + " / " + str(reserva)
 
-			if i == slot_actual:
-				slot_nodo.modulate = Color(1.0, 1.0, 1.0, 1.0)
-			else:
-				slot_nodo.modulate = Color(0.4, 0.4, 0.4, 0.7)
+			# Arma en mano: borde naranja. Las otras, tarjeta de vidrio normal.
+			slot_nodo.theme_type_variation = &"TarjetaArmaActiva" if i == slot_actual else &"TarjetaArma"
+			slot_nodo.modulate = Color.WHITE if i == slot_actual else Color(1, 1, 1, 0.7)
 		else:
-			if lbl_nombre: lbl_nombre.text = "---"
-			if lbl_balas: lbl_balas.text = "Vacío"
-			slot_nodo.modulate = Color(0.2, 0.2, 0.2, 0.4)
+			if lbl_nombre: lbl_nombre.text = "Vacío"
+			if lbl_balas: lbl_balas.text = "—"
+			slot_nodo.theme_type_variation = &"TarjetaArma"
+			slot_nodo.modulate = Color(1, 1, 1, 0.35)
 
 # ==========================================================
 # 7. EVENTOS RPG, DAÑO Y PROGRESIÓN
@@ -562,6 +566,7 @@ func mejorar_estadistica(estadistica: String):
 
 	puntos_en_stat[estadistica] += 1
 	puntos_mejora -= 1
+	actualizar_ui_xp()
 
 func stat_en_tope(estadistica: String) -> bool:
 	return puntos_en_stat.get(estadistica, 0) >= int(Balance.stat(estadistica)["tope_puntos"])

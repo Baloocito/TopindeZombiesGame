@@ -53,22 +53,25 @@ var celda_previa_tocada: Vector3 = Vector3.INF
 @onready var cuadricula_visual = $CuadriculaVisual
 @onready var texto_game_over = $InterfazUI/TextoGameOver
 @onready var boton_reiniciar = $InterfazUI/BotonReiniciar
-@onready var boton_iniciar = $InterfazUI/BotonIniciar
-@onready var texto_dinero = $InterfazUI/HudSuperiorDerecho/GrupoDinero/PanelDinero/LblDinero
-@onready var boton_reparar = $InterfazUI/BotonReparar
+@onready var boton_iniciar = $InterfazUI/HudInferiorCentro/BotonIniciar
+@onready var texto_dinero = $InterfazUI/HudSuperiorDerecho/Fila/GrupoDinero/Fila/LblDinero
+@onready var boton_reparar = $InterfazUI/HudInferiorCentro/BotonReparar
 
-@onready var boton_pausa = $InterfazUI/HudLateralDerecho/BotonPausa
-@onready var boton_construir = $InterfazUI/HudLateralDerecho/BotonConstruir
-@onready var boton_mochila = $InterfazUI/HudLateralDerecho/BotonMochila
-@onready var boton_ensamblar = $InterfazUI/HudLateralDerecho/BotonEnsamblar
-@onready var boton_nivel = $InterfazUI/HudSuperiorIzquierdo/BotonNivel
+# HUD de vidrio (armado por herramientas/rehacer_hud.gd)
+@onready var hud_dia_inferior = $InterfazUI/HudInferiorCentro
+@onready var hud_dia_lateral = $InterfazUI/HudLateralDerecho
+@onready var boton_pausa = $InterfazUI/HudSuperiorDerecho/Fila/BotonPausa
+@onready var boton_construir = $InterfazUI/HudLateralDerecho/ItemConstruir/BotonConstruir
+@onready var boton_mochila = $InterfazUI/HudLateralDerecho/ItemMochila/BotonMochila
+@onready var boton_ensamblar = $InterfazUI/HudLateralDerecho/ItemEnsamblar/BotonEnsamblar
+@onready var boton_nivel = $InterfazUI/HudSuperiorIzquierdo/TarjetaJugador/Fila/BotonNivel
 
 @onready var hud_combate = $InterfazUI/EsquinaArmas
 @onready var slot_arma_1 = $InterfazUI/EsquinaArmas/ContenedorArmas/SlotArma1
 @onready var slot_arma_2 = $InterfazUI/EsquinaArmas/ContenedorArmas/SlotArma2
 @onready var slot_arma_3 = $InterfazUI/EsquinaArmas/ContenedorArmas/SlotArma3
 @onready var btn_recarga_izq = $InterfazUI/BotonRecargaIzquierdo
-@onready var btn_recarga_der = $InterfazUI/BotonRecargaDerecho
+@onready var btn_recarga_der = $InterfazUI/EsquinaArmas/BotonRecargaDerecho
 
 @onready var panel_fase = $InterfazUI/ContenedorAlertas/PanelFase
 @onready var lbl_titulo_fase = $InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/LblTituloFase
@@ -350,7 +353,7 @@ func sincronizar_jugador_tardio(oleada: int, dinero: int, en_combate: bool):
 	fase_combate = en_combate
 
 	if texto_dinero:
-		texto_dinero.text = str(dinero_global) + "G"
+		texto_dinero.text = _formato_oro(dinero_global)
 
 	cambiar_fase_ui(en_combate)
 
@@ -449,33 +452,31 @@ func _ready():
 # ----------------------------------------------------------
 # Estilo del HUD (el tema general está en res://ui/tema.tres)
 # ----------------------------------------------------------
-var _lbl_iniciar: Label
-
 func _preparar_estilo_hud():
-	for b in [boton_pausa, boton_construir, boton_mochila, boton_ensamblar, boton_nivel,
-			btn_recarga_izq, btn_recarga_der, boton_iniciar]:
-		EstiloUI.preparar_boton_icono(b)
-	for slot in [slot_arma_1, slot_arma_2, slot_arma_3]:
-		if slot: EstiloUI.agregar_rebote(slot)
-	if boton_reparar: EstiloUI.agregar_rebote(boton_reparar)
-	if boton_reiniciar: EstiloUI.agregar_rebote(boton_reiniciar)
-	# El dibujo de "Iniciar Horda" ya trae su texto: el botón no escribe
-	# encima; el estado de la votación va en una etiqueta debajo.
-	if boton_iniciar:
-		boton_iniciar.text = ""
-		_lbl_iniciar = Label.new()
-		_lbl_iniciar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_lbl_iniciar.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_lbl_iniciar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-		_lbl_iniciar.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		_lbl_iniciar.position.y = 4
-		_lbl_iniciar.add_theme_font_size_override("font_size", 18)
-		_lbl_iniciar.add_theme_constant_override("outline_size", 6)
-		boton_iniciar.add_child(_lbl_iniciar)
+	# Los botones del HUD nuevo se conectan aquí (antes estaban en la escena).
+	var conexiones = [[boton_nivel, _on_boton_nivel_pressed], [boton_pausa, _on_boton_pausa_pressed],
+		[boton_construir, _on_boton_construir_pressed], [boton_mochila, _on_boton_mochila_pressed],
+		[boton_ensamblar, _on_boton_ensamblar_pressed], [boton_reparar, ejecutar_reparacion_global]]
+	for par in conexiones:
+		if par[0] and not par[0].pressed.is_connected(par[1]):
+			par[0].pressed.connect(par[1])
+	for b in $InterfazUI.find_children("*", "BaseButton", true, false):
+		EstiloUI.agregar_rebote(b)
 
 func _texto_iniciar(texto: String):
-	if boton_iniciar: boton_iniciar.text = ""
-	if _lbl_iniciar: _lbl_iniciar.text = texto
+	if boton_iniciar: boton_iniciar.text = texto if texto != "" else "Iniciar noche"
+
+func _resaltar_construir(activo: bool):
+	if boton_construir:
+		boton_construir.modulate = Color(1.0, 0.72, 0.45) if activo else Color.WHITE
+
+func _formato_oro(valor: int) -> String:
+	var texto := str(abs(valor))
+	var con_puntos := ""
+	while texto.length() > 3:
+		con_puntos = "." + texto.right(3) + con_puntos
+		texto = texto.left(texto.length() - 3)
+	return ("-" if valor < 0 else "") + texto + con_puntos
 
 func conectar_botones_combate():
 	var equipar_lambda = func(slot_id: int):
@@ -499,7 +500,7 @@ func conectar_botones_combate():
 func _al_presionar_iniciar():
 	# El jugador presiona, deshabilitamos su botón para evitar spam
 	boton_iniciar.disabled = true
-	_texto_iniciar("¡LISTO! Esperando al equipo")
+	_texto_iniciar("Esperando al equipo…")
 	# Le enviamos el voto al Servidor
 	declarar_listo_servidor.rpc_id(1, multiplayer.get_unique_id())
 
@@ -522,7 +523,7 @@ func declarar_listo_servidor(id_jugador: int):
 @rpc("call_local", "reliable")
 func actualizar_ui_listos(listos: int, totales: int):
 	if boton_iniciar and not boton_iniciar.disabled:
-		_texto_iniciar("%d/%d listos" % [listos, totales])
+		_texto_iniciar("Listos %d/%d" % [listos, totales])
 
 # dar_bono = false al empezar o continuar una partida: no hay noche recién
 # superada que premiar ni que guardar.
@@ -583,8 +584,8 @@ func iniciar_oleada_en_red():
 		$GeneradorZombies.iniciar_generacion()
 
 func cambiar_fase_ui(es_combate: bool):
-	var ui_dia = [boton_iniciar, boton_construir, boton_mochila, boton_nivel, boton_ensamblar]
-	var ui_noche = [hud_combate, btn_recarga_izq, btn_recarga_der]
+	var ui_dia = [hud_dia_inferior, hud_dia_lateral]
+	var ui_noche = [hud_combate]
 
 	for elemento in ui_dia:
 		if is_instance_valid(elemento): elemento.visible = not es_combate
@@ -653,7 +654,7 @@ func quitar_plano_para_todos(id_arma: String):
 @rpc("authority", "call_local", "reliable")
 func actualizar_dinero_para_todos(nuevo_valor: int):
 	dinero_global = nuevo_valor
-	if texto_dinero: texto_dinero.text = str(dinero_global) + "G"
+	if texto_dinero: texto_dinero.text = _formato_oro(dinero_global)
 	actualizar_boton_reparacion()
 
 # Antes el servidor sumaba la XP sobre SUS copias de los jugadores, y solo
@@ -791,8 +792,8 @@ func ejecutar_game_over_en_red():
 	boton_reiniciar.visible = true
 
 	cambiar_fase_ui(false)
-	boton_iniciar.visible = false
-	boton_construir.visible = false
+	hud_dia_inferior.visible = false
+	hud_dia_lateral.visible = false
 
 func _on_boton_reiniciar_pressed():
 	get_tree().reload_current_scene()
@@ -812,7 +813,7 @@ func alternar_modo_construccion():
 	if fase_combate: return
 	if modo_construccion:
 		modo_construccion = false
-		boton_construir.modulate = Color.WHITE
+		_resaltar_construir(false)
 		holograma.visible = false
 		animar_cuadricula(false)
 	else:
@@ -822,7 +823,7 @@ func iniciar_colocacion_objeto(clave: String):
 	modo_construccion = true
 	objeto_seleccionado_tienda = clave
 
-	boton_construir.modulate = Color(1, 0.5, 0.5)
+	_resaltar_construir(true)
 	holograma.visible = false
 	celda_previa_tocada = Vector3.INF
 	animar_cuadricula(true)
@@ -858,7 +859,7 @@ func construir_estructura():
 	holograma.visible = false
 	animar_cuadricula(false)
 	modo_construccion = false
-	boton_construir.modulate = Color.WHITE
+	_resaltar_construir(false)
 
 @rpc("any_peer", "reliable")
 func solicitar_construccion(tipo: String, pos_llave: Vector3, pos_real: Vector3, mult_ing: float):
@@ -989,10 +990,14 @@ func _on_boton_pausa_pressed() -> void:
 
 func cerrar_menu_lateral():
 	if panel_lateral: panel_lateral.visible = false
+	# Las herramientas de la derecha quedan debajo del panel: se ocultan
+	# mientras está abierto y vuelven al cerrarlo (solo de día).
+	if hud_dia_lateral: hud_dia_lateral.visible = not fase_combate
 
 func abrir_menu_interactivo(menu_activo: Control, funcion_generadora: Callable):
 	if fase_combate: return
 	panel_lateral.visible = true
+	if hud_dia_lateral: hud_dia_lateral.visible = false
 	var todos_los_menus = [menu_armeria, menu_construccion, menu_inspector, menu_nivel, menu_ensamblaje]
 	for menu in todos_los_menus:
 		if is_instance_valid(menu):
