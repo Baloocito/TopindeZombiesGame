@@ -14,8 +14,8 @@ func _titulo(contenedor: Control, texto: String):
 	var titulo = Label.new()
 	titulo.text = texto
 	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	titulo.add_theme_font_size_override("font_size", 24)
-	titulo.add_theme_color_override("font_color", Color(1, 0.8, 0.2))
+	titulo.theme_type_variation = &"Titulo"
+	titulo.add_theme_font_size_override("font_size", 30)
 	contenedor.add_child(titulo)
 	var separador = HSeparator.new()
 	separador.add_theme_constant_override("separation", 15)
@@ -23,6 +23,12 @@ func _titulo(contenedor: Control, texto: String):
 
 func _limpiar(contenedor: Control):
 	for hijo in contenedor.get_children(): hijo.queue_free()
+	if not contenedor.child_entered_tree.is_connected(_al_agregar_hijo):
+		contenedor.child_entered_tree.connect(_al_agregar_hijo)
+
+func _al_agregar_hijo(nodo: Node):
+	if nodo is BaseButton: EstiloUI.agregar_rebote(nodo)
+	for b in nodo.find_children("*", "BaseButton", true, false): EstiloUI.agregar_rebote(b)
 
 func _espacio(contenedor: Control, alto: int):
 	var espacio = Control.new()
@@ -42,7 +48,7 @@ func actualizar_lista_armeria():
 	for arma in jugador.armas_inventario:
 		var fila = HBoxContainer.new()
 		var btn_nombre = Button.new()
-		btn_nombre.text = ("▼ " if arma_inspeccionada == arma else "▶ ") + arma.nombre
+		btn_nombre.text = ("– " if arma_inspeccionada == arma else "+ ") + arma.nombre
 		btn_nombre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn_nombre.add_theme_font_size_override("font_size", 18)
 		btn_nombre.pressed.connect(func():
@@ -57,7 +63,7 @@ func actualizar_lista_armeria():
 			btn_slot.text = str(i + 1)
 			btn_slot.custom_minimum_size = Vector2(45, 45)
 			if jugador.armas_equipadas[i] == arma:
-				btn_slot.modulate = Color(0.2, 1, 0.2)
+				btn_slot.theme_type_variation = &"BotonPrimario"
 			btn_slot.pressed.connect(func():
 				jugador.equipar_en_slot(arma, i)
 				if jugador.slot_actual == i: jugador.cambiar_arma(i)
@@ -81,17 +87,16 @@ func actualizar_lista_armeria():
 func actualizar_lista_construccion():
 	var menu: Control = m.menu_construccion
 	_limpiar(menu)
-	_titulo(menu, "--- INGENIERÍA ---")
+	_titulo(menu, "INGENIERÍA")
 	for clave in Balance.estructuras.keys():
 		var datos: Dictionary = Balance.estructura(clave)
 		var costo_actual: int = m.obtener_precio_estructura(clave)
 		var btn = Button.new()
-		btn.text = "%s ($%d) | HP: %d" % [datos["nombre"], costo_actual, int(datos["hp"])]
+		btn.text = "%s\n$%d  ·  %d HP" % [datos["nombre"], costo_actual, int(datos["hp"])]
+		btn.add_theme_font_size_override("font_size", 18)
 		btn.custom_minimum_size = Vector2(0, 60)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if m.dinero_global < costo_actual:
-			btn.disabled = true
-			btn.modulate = Color(1, 0.5, 0.5)
+		btn.disabled = m.dinero_global < costo_actual
 		btn.pressed.connect(func():
 			m.iniciar_colocacion_objeto(clave)
 			m.cerrar_menu_lateral()
@@ -271,12 +276,12 @@ func actualizar_lista_ensamblaje():
 		btn.custom_minimum_size = Vector2(0, 50)
 		if not arma_poseida:
 			btn.text = "Ensamblar\n$" + str(costo_ensamblar)
-			btn.modulate = Color(0.5, 1.0, 0.5)
+			btn.theme_type_variation = &"BotonPrimario"
 			btn.disabled = m.dinero_global < costo_ensamblar
 			btn.pressed.connect(func(): m.pedir_ensamblar(clave))
 		else:
 			btn.text = "Forjar Mejora Aleatoria\n$" + str(costo_mejorar)
-			btn.modulate = Color(0.4, 0.8, 1.0)
+			btn.theme_type_variation = &"BotonPrimario"
 			btn.disabled = m.dinero_global < costo_mejorar
 			btn.pressed.connect(func(): m.pedir_mejora(clave))
 		menu.add_child(btn)

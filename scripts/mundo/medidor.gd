@@ -15,7 +15,11 @@ func _ready():
 	name = "MedidorRendimiento"
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = OS.is_debug_build()
-	position = Vector2(8, 150)
+	# Abajo al centro: no tapa el HUD ni los joysticks.
+	anchor_left = 0.5; anchor_right = 0.5; anchor_top = 1.0; anchor_bottom = 1.0
+	offset_left = -320; offset_right = 320; offset_top = -58; offset_bottom = -6
+	horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	add_theme_font_size_override("font_size", 16)
 	add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
 	add_theme_color_override("font_outline_color", Color.BLACK)

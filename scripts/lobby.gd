@@ -52,6 +52,7 @@ func _ready():
 	multiplayer.connection_failed.connect(_on_falla_de_conexion)
 
 	_crear_controles_nuevos()
+	_aplicar_estilo()
 
 func _crear_controles_nuevos():
 	var vbox = $VBoxContainer
@@ -122,6 +123,39 @@ func _on_btn_continuar_pressed():
 	_continuando = true
 	_on_btn_host_pressed()
 	_continuando = false
+
+# Presentación: fondo oscuro y todo dentro de una tarjeta centrada.
+func _aplicar_estilo():
+	var fondo := ColorRect.new()
+	fondo.color = Color(0.078, 0.09, 0.11)
+	fondo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fondo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(fondo)
+	move_child(fondo, 0)
+
+	var vbox: VBoxContainer = $VBoxContainer
+	var centro := CenterContainer.new()
+	centro.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(centro)
+	var tarjeta := PanelContainer.new()
+	centro.add_child(tarjeta)
+	vbox.reparent(tarjeta, false)
+	vbox.custom_minimum_size = Vector2(460, 0)
+	vbox.add_theme_constant_override("separation", 12)
+
+	var titulo: Label = vbox.get_node("Label")
+	titulo.text = "PARTIDA EN EQUIPO"
+	titulo.theme_type_variation = &"Titulo"
+	titulo.add_theme_font_size_override("font_size", 32)
+	titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	btn_host.theme_type_variation = &"BotonPrimario"
+	boton_iniciar.theme_type_variation = &"BotonPrimario"
+	boton_continuar.theme_type_variation = &"BotonPrimario"
+	lista_jugadores.custom_minimum_size = Vector2(0, 120)
+	input_ip.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	for b in [btn_host, btn_unirse, boton_iniciar, boton_continuar, boton_volver]:
+		EstiloUI.agregar_rebote(b)
 
 func _actualizar_texto_boton_host():
 	btn_host.text = "Jugar Solo" if cantidad_deseada <= 1 else "Crear Partida (Host)"

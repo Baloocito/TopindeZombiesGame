@@ -6,6 +6,8 @@ func _ready():
 	visible = false
 	if panel_opciones:
 		panel_opciones.visible = false 
+	for b in $VBoxContainer.get_children():
+		if b is BaseButton: EstiloUI.agregar_rebote(b)
 
 func alternar_pausa():
 	visible = !visible

@@ -360,6 +360,8 @@ visible = false
 theme_override_colors/font_color = Color(0.79607844, 0, 0, 1)
 theme_override_font_sizes/font_size = 100
 text = "¡HAS MUERTO!"
+theme_override_colors/font_outline_color = Color(0.16, 0.03, 0.02, 1)
+theme_override_constants/outline_size = 18
 
 [node name="BotonReiniciar" type="Button" parent="InterfazUI" unique_id=538405564]
 layout_mode = 3
@@ -375,8 +377,8 @@ offset_bottom = 120
 grow_horizontal = 2
 grow_vertical = 2
 visible = false
-theme_override_font_sizes/font_size = 30
-text = "REINTENTAR!"
+theme_type_variation = &"BotonPrimario"
+text = "Reintentar"
 
 [node name="ContenedorAlertas" type="VBoxContainer" parent="InterfazUI" unique_id=2066624411]
 visible = false
@@ -411,7 +413,7 @@ size_flags_vertical = 8
 
 [node name="Icono" type="Label" parent="InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/CajaZombies" unique_id=65300647]
 layout_mode = 2
-text = "💀"
+text = "BAJAS"
 
 [node name="LblZombies" type="Label" parent="InterfazUI/ContenedorAlertas/PanelFase/VBoxContainer/CajaZombies" unique_id=1696849329]
 layout_mode = 2

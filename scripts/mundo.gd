@@ -420,6 +420,7 @@ func _ready():
 		EstadoPartida.mostrar_overlay_texto("Sincronizando partida…")
 		solicitar_sincronizacion_tardia.rpc_id(1, EstadoPartida.mi_token, EstadoPartida.id_persistente)
 	conectar_botones_combate()
+	_preparar_estilo_hud()
 
 	if multiplayer.is_server():
 		EstadoPartida.mi_id_logico = 1 # El Host siempre es el id 1
@@ -445,6 +446,37 @@ func _ready():
 		sumar_dinero(0)
 		fase_preparacion_en_red.rpc(oleada_actual, false)
 
+# ----------------------------------------------------------
+# Estilo del HUD (el tema general está en res://ui/tema.tres)
+# ----------------------------------------------------------
+var _lbl_iniciar: Label
+
+func _preparar_estilo_hud():
+	for b in [boton_pausa, boton_construir, boton_mochila, boton_ensamblar, boton_nivel,
+			btn_recarga_izq, btn_recarga_der, boton_iniciar]:
+		EstiloUI.preparar_boton_icono(b)
+	for slot in [slot_arma_1, slot_arma_2, slot_arma_3]:
+		if slot: EstiloUI.agregar_rebote(slot)
+	if boton_reparar: EstiloUI.agregar_rebote(boton_reparar)
+	if boton_reiniciar: EstiloUI.agregar_rebote(boton_reiniciar)
+	# El dibujo de "Iniciar Horda" ya trae su texto: el botón no escribe
+	# encima; el estado de la votación va en una etiqueta debajo.
+	if boton_iniciar:
+		boton_iniciar.text = ""
+		_lbl_iniciar = Label.new()
+		_lbl_iniciar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_lbl_iniciar.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_lbl_iniciar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+		_lbl_iniciar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_lbl_iniciar.position.y = 4
+		_lbl_iniciar.add_theme_font_size_override("font_size", 18)
+		_lbl_iniciar.add_theme_constant_override("outline_size", 6)
+		boton_iniciar.add_child(_lbl_iniciar)
+
+func _texto_iniciar(texto: String):
+	if boton_iniciar: boton_iniciar.text = ""
+	if _lbl_iniciar: _lbl_iniciar.text = texto
+
 func conectar_botones_combate():
 	var equipar_lambda = func(slot_id: int):
 		var mi_jugador = obtener_jugador_local()
@@ -467,7 +499,7 @@ func conectar_botones_combate():
 func _al_presionar_iniciar():
 	# El jugador presiona, deshabilitamos su botón para evitar spam
 	boton_iniciar.disabled = true
-	boton_iniciar.text = "¡Listo!"
+	_texto_iniciar("¡LISTO! Esperando al equipo")
 	# Le enviamos el voto al Servidor
 	declarar_listo_servidor.rpc_id(1, multiplayer.get_unique_id())
 
@@ -490,7 +522,7 @@ func declarar_listo_servidor(id_jugador: int):
 @rpc("call_local", "reliable")
 func actualizar_ui_listos(listos: int, totales: int):
 	if boton_iniciar and not boton_iniciar.disabled:
-		boton_iniciar.text = "Iniciar Noche (" + str(listos) + "/" + str(totales) + ")"
+		_texto_iniciar("%d/%d listos" % [listos, totales])
 
 # dar_bono = false al empezar o continuar una partida: no hay noche recién
 # superada que premiar ni que guardar.
@@ -532,7 +564,7 @@ func fase_preparacion_en_red(nueva_oleada: int, dar_bono: bool = true):
 	# Restauramos el botón de iniciar para la nueva oleada
 	if boton_iniciar:
 		boton_iniciar.disabled = false
-		boton_iniciar.text = "Iniciar Noche"
+		_texto_iniciar("")
 
 @rpc("call_local", "reliable")
 func iniciar_oleada_en_red():

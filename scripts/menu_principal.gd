@@ -6,6 +6,8 @@ func _ready():
 	# Nos aseguramos de que el texto de aviso esté invisible al inicio
 	texto_proximamente.modulate.a = 0.0
 	texto_proximamente.visible = false
+	for b in $VBoxContainer.get_children():
+		if b is BaseButton: EstiloUI.agregar_rebote(b)
 
 # ==========================================
 # SEÑALES DE LOS BOTONES

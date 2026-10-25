@@ -30,6 +30,44 @@ offset_right = 0
 offset_bottom = 0
 grow_horizontal = 1
 grow_vertical = 1
+color = Color(0.078, 0.09, 0.11, 1)
+
+[node name="Titulo" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -420
+offset_top = -270
+offset_right = 420
+offset_bottom = -170
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"Titulo"
+theme_override_font_sizes/font_size = 72
+text = "TOPIN DE ZOMBIES"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Subtitulo" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300
+offset_top = -172
+offset_right = 300
+offset_bottom = -138
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.54, 0.56, 0.6, 1)
+theme_override_font_sizes/font_size = 18
+text = "TopinGames"
+horizontal_alignment = 1
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=2110514427]
 layout_mode = 1
@@ -38,16 +76,18 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -147
-offset_top = -32
-offset_right = 125
-offset_bottom = 143
 grow_horizontal = 2
 grow_vertical = 2
+offset_left = -190
+offset_right = 190
+theme_override_constants/separation = 14
+offset_top = -70
+offset_bottom = 210
 
 [node name="BotonJugar" type="Button" parent="VBoxContainer" unique_id=369758257]
 layout_mode = 2
 text = "Jugar"
+theme_type_variation = &"BotonPrimario"
 
 [node name="BotonRanking" type="Button" parent="VBoxContainer" unique_id=1153206505]
 layout_mode = 2
@@ -60,6 +100,7 @@ text = "Opciones"
 [node name="BotonSalir" type="Button" parent="VBoxContainer" unique_id=882544380]
 layout_mode = 2
 text = "Salir"
+theme_type_variation = &"BotonPeligro"
 
 [node name="TextoProximamente" type="Label" parent="." unique_id=1723956807]
 layout_mode = 1
@@ -69,14 +110,15 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -303
-offset_top = -132
 offset_right = 275
-offset_bottom = -63
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_colors/font_color = Color(0.05882353, 0.043137256, 0.07058824, 1)
-theme_override_font_sizes/font_size = 50
-text = "TOPINDEZOMBIESGAME"
+theme_override_font_sizes/font_size = 26
+horizontal_alignment = 1
+vertical_alignment = 1
+text = ""
+offset_top = -130
+offset_bottom = -80
 
 [connection signal="pressed" from="VBoxContainer/BotonJugar" to="." method="_on_boton_jugar_pressed"]
 [connection signal="pressed" from="VBoxContainer/BotonRanking" to="." method="_on_boton_ranking_pressed"]

@@ -101,6 +101,10 @@ pointing/emulate_touch_from_mouse=true
 
 3d/physics_engine="Jolt Physics"
 
+[gui]
+
+theme/custom="res://ui/tema.tres"
+
 [rendering]
 
 rendering_device/driver.windows="d3d12"
