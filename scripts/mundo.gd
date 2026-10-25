@@ -819,6 +819,9 @@ func solicitar_construccion(tipo: String, pos_llave: Vector3, pos_real: Vector3,
 	var costo_actual = obtener_precio_estructura(tipo)
 	if dinero_global < costo_actual: return
 	if celdas_ocupadas.has(pos_llave): return
+	# No construir encima de alguien: el jugador quedaba atrapado dentro del
+	# muro (la colisión lo dejaba pegado sin poder moverse).
+	if _hay_alguien_en(pos_real): return
 
 	sumar_dinero(-costo_actual)
 	ejecutar_construccion_en_red.rpc(tipo, pos_llave, pos_real, mult_ing)
@@ -842,6 +845,16 @@ func ejecutar_construccion_en_red(tipo: String, pos_llave: Vector3, pos_real: Ve
 	if objeto_seleccionado_tienda == "": return
 	var costo_siguiente = obtener_precio_estructura(objeto_seleccionado_tienda)
 	holograma.material_override.albedo_color = Color(0, 1, 0, 0.6) if dinero_global >= costo_siguiente else Color(1, 0, 0, 0.6)
+
+const RADIO_LIBRE_CONSTRUCCION: float = 1.4
+
+func _hay_alguien_en(pos: Vector3) -> bool:
+	for grupo in ["jugador", "enemigos"]:
+		for n in get_tree().get_nodes_in_group(grupo):
+			if not is_instance_valid(n): continue
+			var d := Vector2(n.global_position.x - pos.x, n.global_position.z - pos.z).length()
+			if d < RADIO_LIBRE_CONSTRUCCION: return true
+	return false
 
 func _escena_estructura(tipo: String) -> PackedScene:
 	match tipo:
