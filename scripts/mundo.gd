@@ -186,6 +186,7 @@ var id_logico_por_id_red: Dictionary = {}
 
 func _on_peer_desconectado(id: int):
 	if not multiplayer.is_server(): return
+	peers_en_mundo.erase(id)
 
 	var token = null
 	for t in token_por_id.keys():
@@ -216,7 +217,7 @@ func _on_peer_desconectado(id: int):
 # NUEVA función: la llama el propio cliente (nuevo O reconectado) cuando YA
 # cargó Mundo.tscn. Un solo punto de entrada para los dos casos.
 @rpc("any_peer", "reliable")
-func solicitar_sincronizacion_tardia(token: String):
+func solicitar_sincronizacion_tardia(token: String, id_persistente: String = ""):
 	if not multiplayer.is_server(): return
 	var id = multiplayer.get_remote_sender_id()
 
@@ -233,6 +234,8 @@ func solicitar_sincronizacion_tardia(token: String):
 		token_por_id[token] = id
 		EstadoPartida.informar_id_logico.rpc_id(id, id)
 		sincronizar_jugador_tardio.rpc_id(id, oleada_actual, dinero_global, fase_combate)
+		_enviar_estado_equipo(id)
+		_enviar_datos_guardados(id, id_persistente)
 		return
 
 	# --- ¿Es una reconexión dentro de la ventana de gracia? ---
@@ -252,9 +255,7 @@ func solicitar_sincronizacion_tardia(token: String):
 			EstadoPartida.informar_id_logico.rpc_id(id, id_logico)
 			sincronizar_jugador_tardio.rpc_id(id, oleada_actual, dinero_global, fase_combate)
 
-			for estructura in get_children():
-				if estructura.is_in_group("barricadas") and "tipo_estructura" in estructura and "salud_actual" in estructura:
-					reproducir_estructura_para_tardio.rpc_id(id, estructura.tipo_estructura, estructura.global_position, estructura.salud_actual, estructura.salud_maxima)
+			_enviar_estado_equipo(id)
 
 			# Le reproducimos a TODOS los jugadores existentes, incluido el suyo
 			# propio (su cliente es una conexión de red nueva -- nunca recibió
@@ -306,9 +307,8 @@ func solicitar_sincronizacion_tardia(token: String):
 		spawnear_jugador(id)
 		EstadoPartida.informar_id_logico.rpc_id(id, id)
 		sincronizar_jugador_tardio.rpc_id(id, oleada_actual, dinero_global, fase_combate)
-		for estructura in get_children():
-			if estructura.is_in_group("barricadas") and "tipo_estructura" in estructura and "salud_actual" in estructura:
-				reproducir_estructura_para_tardio.rpc_id(id, estructura.tipo_estructura, estructura.global_position, estructura.salud_actual, estructura.salud_maxima)
+		_enviar_estado_equipo(id)
+		_enviar_datos_guardados(id, id_persistente)
 		return
 
 	print("Jugador %s intentó entrar a una partida ya en curso sin token válido -- rechazado." % id)
@@ -397,6 +397,7 @@ func _ready():
 	loot.name = "Loot"
 	loot.m = self
 	add_child(loot)
+	$InterfazUI.add_child(MedidorRendimiento.new())
 
 	holograma.visible = false
 	panel_fase.visible = false
@@ -417,7 +418,7 @@ func _ready():
 		# congelada / personaje invisible que no responde. Se oculta solo en
 		# EstadoPartida.informar_id_logico() apenas el servidor confirma.
 		EstadoPartida.mostrar_overlay_texto("Sincronizando partida…")
-		solicitar_sincronizacion_tardia.rpc_id(1, EstadoPartida.mi_token)
+		solicitar_sincronizacion_tardia.rpc_id(1, EstadoPartida.mi_token, EstadoPartida.id_persistente)
 	conectar_botones_combate()
 
 	if multiplayer.is_server():
@@ -438,8 +439,11 @@ func _ready():
 
 		# El Host configura la partida inicial y avisa a todos
 		generar_jugadores_multijugador()
+		if not EstadoPartida.partida_a_cargar.is_empty():
+			_aplicar_partida_guardada(EstadoPartida.partida_a_cargar)
+			EstadoPartida.partida_a_cargar = {}
 		sumar_dinero(0)
-		fase_preparacion_en_red.rpc(1)
+		fase_preparacion_en_red.rpc(oleada_actual, false)
 
 func conectar_botones_combate():
 	var equipar_lambda = func(slot_id: int):
@@ -488,8 +492,10 @@ func actualizar_ui_listos(listos: int, totales: int):
 	if boton_iniciar and not boton_iniciar.disabled:
 		boton_iniciar.text = "Iniciar Noche (" + str(listos) + "/" + str(totales) + ")"
 
+# dar_bono = false al empezar o continuar una partida: no hay noche recién
+# superada que premiar ni que guardar.
 @rpc("call_local", "reliable")
-func fase_preparacion_en_red(nueva_oleada: int):
+func fase_preparacion_en_red(nueva_oleada: int, dar_bono: bool = true):
 	oleada_actual = nueva_oleada
 	fase_combate = false
 	modo_construccion = false
@@ -509,8 +515,11 @@ func fase_preparacion_en_red(nueva_oleada: int):
 
 	# XP por noche superada (Manual v3 §5). Cada pantalla se la da a SU
 	# jugador: esta función ya corre en todos los peers.
-	if oleada_actual > 1:
+	if dar_bono and oleada_actual > 1:
 		_dar_experiencia_local(Balance.xp_por_noche(oleada_actual - 1))
+		# Guardado al cerrar la noche: cada pantalla manda su personaje al
+		# servidor, que escribe la partida completa.
+		_reportar_mi_estado()
 
 	animar_fase("DÍA " + str(oleada_actual) + ": PREPÁRATE", Color.WHITE)
 	cambiar_fase_ui(false)
@@ -743,6 +752,8 @@ func ejecutar_game_over_en_red():
 		if oleada_actual > GuardadoGlobal.record_oleada:
 			GuardadoGlobal.record_oleada = oleada_actual
 		GuardadoGlobal.guardar_datos()
+		# La partida terminó: ya no hay nada que continuar.
+		GuardadoGlobal.borrar_partida()
 
 	texto_game_over.visible = true
 	boton_reiniciar.visible = true
@@ -1085,3 +1096,160 @@ func mostrar_aviso(texto: String):
 	tween.tween_interval(3.0)
 	tween.tween_property(etiqueta, "modulate:a", 0.0, 0.6)
 	tween.tween_callback(etiqueta.queue_free)
+
+# ==========================================================
+# 12. GUARDADO AL CERRAR CADA NOCHE Y CONTINUAR (Fase 1)
+# ==========================================================
+# Al terminar una noche (fase_preparacion_en_red), cada pantalla manda los
+# datos de su personaje al servidor, y el servidor escribe la partida
+# completa en el equipo del anfitrión. Al continuar, el servidor reconstruye
+# el equipo y le devuelve a cada jugador su personaje según su identidad
+# guardada (si no la encuentra, le da el primer personaje libre).
+
+var _estado_jugadores: Dictionary = {}      # nombre del nodo del jugador -> datos (servidor)
+var _slots_guardados: Dictionary = {}       # al continuar: nombre viejo -> datos
+var _slots_entregados: Array = []
+var _datos_propios_pendientes: Dictionary = {}
+
+func _reportar_mi_estado():
+	var jugador = obtener_jugador_local()
+	if not jugador: return
+	var datos: Dictionary = jugador.exportar_estado()
+	datos["orden"] = int(str(jugador.name))
+	datos["id_persistente"] = EstadoPartida.id_persistente
+	reportar_estado_jugador.rpc_id(1, datos)
+
+# Se guarda por personaje (nombre del nodo), no por identidad: así dos
+# instancias del juego en el mismo PC (pruebas) no se pisan.
+@rpc("any_peer", "call_local", "reliable")
+func reportar_estado_jugador(datos: Dictionary):
+	if not multiplayer.is_server(): return
+	_estado_jugadores[str(datos.get("orden", 0))] = datos
+	GuardadoGlobal.guardar_partida(_snapshot_partida())
+
+func _snapshot_partida() -> Dictionary:
+	var estructuras := []
+	for n in get_children():
+		if n is EstructuraBase:
+			var e := {"tipo": n.tipo_estructura, "x": n.global_position.x, "y": n.global_position.y, "z": n.global_position.z,
+				"salud": n.salud_actual, "salud_maxima": n.salud_maxima}
+			if "arma_equipada" in n and n.arma_equipada:
+				e["arma"] = n.arma_equipada.a_diccionario()
+				e["balas"] = n.balas_cargadas
+			estructuras.append(e)
+	return {
+		"version": 1,
+		"fecha": Time.get_datetime_string_from_system(),
+		"oleada": oleada_actual,
+		"dinero": dinero_global,
+		"planos": planos_desbloqueados.duplicate(),
+		"nivel_armas": nivel_armas.duplicate(),
+		"construcciones": construcciones_realizadas.duplicate(),
+		"estructuras": estructuras,
+		"jugadores": _estado_jugadores.duplicate(true),
+	}
+
+# Servidor, al arrancar Mundo con una partida guardada.
+func _aplicar_partida_guardada(d: Dictionary):
+	oleada_actual = int(d.get("oleada", 1))
+	dinero_global = int(d.get("dinero", dinero_global))
+	planos_desbloqueados.clear()
+	for p in d.get("planos", []): planos_desbloqueados.append(str(p))
+	for k in d.get("nivel_armas", {}).keys(): nivel_armas[k] = int(d["nivel_armas"][k])
+	for k in d.get("construcciones", {}).keys(): construcciones_realizadas[k] = int(d["construcciones"][k])
+	for e in d.get("estructuras", []):
+		var pos := Vector3(float(e["x"]), float(e["y"]), float(e["z"]))
+		var nodo = _crear_estructura(str(e["tipo"]), pos)
+		if not nodo: continue
+		celdas_ocupadas[_llave_celda(pos)] = true
+		nodo.salud_maxima = int(e["salud_maxima"])
+		nodo.salud_actual = int(e["salud"])
+		if e.has("arma") and "arma_equipada" in nodo:
+			nodo.arma_equipada = ArmaData.desde_diccionario(e["arma"])
+			nodo.balas_cargadas = int(e.get("balas", 0))
+	_slots_guardados = d.get("jugadores", {})
+	# Los personajes que nadie reclamó todavía se siguen guardando, con una
+	# clave aparte para no chocar con los nombres de nodo de esta sesión.
+	_estado_jugadores.clear()
+	for k in _slots_guardados.keys():
+		_estado_jugadores["guardado_" + str(k)] = _slots_guardados[k]
+	# El anfitrión recupera su personaje de inmediato.
+	var mio := _tomar_slot(EstadoPartida.id_persistente, "1")
+	if not mio.is_empty():
+		var jugador = obtener_jugador_local()
+		if jugador: jugador.importar_estado(mio)
+	print("Partida guardada cargada: noche %d, %d jugadores guardados." % [oleada_actual, _slots_guardados.size()])
+
+# Busca el personaje guardado de esta identidad; si no está (otro equipo, o
+# varias instancias en el mismo PC), entrega el primero libre por orden.
+var _slot_de_nombre: Dictionary = {}  # nombre de nodo nuevo -> clave del slot que tomó
+
+func _tomar_slot(id_persistente: String, nombre_nuevo: String) -> Dictionary:
+	if _slots_guardados.is_empty(): return {}
+	# Si este personaje ya recibió su slot (pidió sincronizar dos veces), el mismo.
+	if _slot_de_nombre.has(nombre_nuevo):
+		return _slots_guardados[_slot_de_nombre[nombre_nuevo]]
+	var libres := _slots_guardados.keys().filter(func(k): return not (k in _slots_entregados))
+	if libres.is_empty(): return {}
+	libres.sort_custom(func(a, b): return int(_slots_guardados[a].get("orden", 0)) < int(_slots_guardados[b].get("orden", 0)))
+	var clave: String = libres[0]
+	for k in libres:
+		if str(_slots_guardados[k].get("id_persistente", "")) == id_persistente:
+			clave = k
+			break
+	_slots_entregados.append(clave)
+	_slot_de_nombre[nombre_nuevo] = clave
+	# Desde ahora ese personaje se guarda bajo el nombre de su nodo nuevo.
+	var datos: Dictionary = _slots_guardados[clave]
+	_estado_jugadores.erase("guardado_" + clave)
+	datos["orden"] = int(nombre_nuevo)
+	datos["id_persistente"] = id_persistente
+	_estado_jugadores[nombre_nuevo] = datos
+	return datos
+
+func _enviar_datos_guardados(id_red: int, id_persistente: String):
+	if _slots_guardados.is_empty(): return
+	var datos := _tomar_slot(id_persistente, str(id_red))
+	if not datos.is_empty():
+		cargar_estado_jugador.rpc_id(id_red, datos)
+
+@rpc("authority", "reliable")
+func cargar_estado_jugador(datos: Dictionary):
+	# Puede llegar antes que nuestro personaje: se aplica en _process.
+	_datos_propios_pendientes = datos
+
+func _process(_delta):
+	if _datos_propios_pendientes.is_empty(): return
+	var jugador = obtener_jugador_local()
+	if jugador and jugador.is_inside_tree():
+		jugador.importar_estado(_datos_propios_pendientes)
+		_datos_propios_pendientes = {}
+
+# Peers que ya cargaron Mundo y recibieron el estado del equipo (servidor).
+var peers_en_mundo: Array = []
+
+# Lo que es del equipo y no viaja solo: estructuras, planos y precios.
+func _enviar_estado_equipo(id: int):
+	if not (id in peers_en_mundo): peers_en_mundo.append(id)
+	# Los sincronizadores de estructuras se le abren un momento después, cuando
+	# ya recibió (por RPC confiable) las estructuras que van a sincronizar.
+	get_tree().create_timer(0.5).timeout.connect(func():
+		for e in get_children():
+			if e is EstructuraBase and e.has_node("MultiplayerSynchronizer"):
+				e.get_node("MultiplayerSynchronizer").set_visibility_for(id, true)
+				# Las RPC hacia un nodo también requieren que el peer lo "vea".
+				if "arma_equipada" in e and e.arma_equipada:
+					e.instalar_arma_en_red.rpc_id(id, e.arma_equipada.a_diccionario()))
+	for estructura in get_children():
+		if estructura is EstructuraBase:
+			reproducir_estructura_para_tardio.rpc_id(id, estructura.tipo_estructura, estructura.global_position, estructura.salud_actual, estructura.salud_maxima)
+	sincronizar_equipo.rpc_id(id, planos_desbloqueados, construcciones_realizadas, nivel_armas)
+
+@rpc("authority", "reliable")
+func sincronizar_equipo(planos: Array, construcciones: Dictionary, niveles: Dictionary):
+	planos_desbloqueados.clear()
+	for p in planos: planos_desbloqueados.append(str(p))
+	for k in construcciones.keys(): construcciones_realizadas[k] = int(construcciones[k])
+	for k in niveles.keys(): nivel_armas[k] = int(niveles[k])
+	for e in get_children():
+		if e is EstructuraBase: celdas_ocupadas[_llave_celda(e.global_position)] = true

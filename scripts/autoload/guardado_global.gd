@@ -44,3 +44,26 @@ func cargar_datos():
 			record_oleada = datos_recuperados.get("record_oleada", 1)
 			zombies_totales = datos_recuperados.get("zombies_totales", 0)
 			print("¡Datos Cargados! Récord: Día ", record_oleada)
+
+# ==========================================================
+# PARTIDA EN CURSO (Fase 1: guardado al cerrar cada noche)
+# ==========================================================
+# Solo la guarda el anfitrión. Se sobrescribe al terminar cada noche y se
+# borra con el Game Over.
+const RUTA_PARTIDA := "user://partida_guardada.json"
+
+func guardar_partida(datos: Dictionary) -> void:
+	var f := FileAccess.open(RUTA_PARTIDA, FileAccess.WRITE)
+	if f: f.store_string(JSON.stringify(datos, "\t"))
+
+func existe_partida() -> bool:
+	return FileAccess.file_exists(RUTA_PARTIDA)
+
+func cargar_partida() -> Dictionary:
+	if not existe_partida(): return {}
+	var datos = JSON.parse_string(FileAccess.get_file_as_string(RUTA_PARTIDA))
+	return datos if typeof(datos) == TYPE_DICTIONARY else {}
+
+func borrar_partida() -> void:
+	if existe_partida():
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(RUTA_PARTIDA))

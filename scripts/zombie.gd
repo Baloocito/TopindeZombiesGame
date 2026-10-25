@@ -30,6 +30,12 @@ var puede_atacar: bool = true
 var esta_muerto: bool = false
 var tiempo_vivo: float = 0.0
 
+# Rendimiento (Fase 1): buscar presa y recalcular la ruta cada frame, con 70
+# zombies, era lo más caro del servidor. Ahora se hace cada 0,25 s, con un
+# desfase al azar para que no lo hagan todos en el mismo frame.
+const INTERVALO_IA: float = 0.25
+var _temporizador_ia: float = randf() * INTERVALO_IA
+
 # ==========================================================
 # 2. NODOS HIJOS Y AUTORIDAD
 # ==========================================================
@@ -99,14 +105,19 @@ func _physics_process(delta):
 		return
 
 	# Actualizamos la presa en tiempo real
-	jugador_objetivo = buscar_presa_mas_cercana()
+	_temporizador_ia -= delta
+	var recalcular := _temporizador_ia <= 0.0 or not is_instance_valid(jugador_objetivo)
+	if recalcular:
+		_temporizador_ia = INTERVALO_IA
+		jugador_objetivo = buscar_presa_mas_cercana()
 
 	if is_instance_valid(jugador_objetivo):
 		var distancia_real = global_position.distance_to(jugador_objetivo.global_position)
 
 		if distancia_real > rango_ataque:
 			if agente_nav:
-				agente_nav.target_position = jugador_objetivo.global_position
+				if recalcular:
+					agente_nav.target_position = jugador_objetivo.global_position
 				var siguiente_paso = agente_nav.get_next_path_position()
 
 				var direccion = global_position.direction_to(siguiente_paso)

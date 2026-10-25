@@ -565,3 +565,63 @@ func mejorar_estadistica(estadistica: String):
 
 func stat_en_tope(estadistica: String) -> bool:
 	return puntos_en_stat.get(estadistica, 0) >= int(Balance.stat(estadistica)["tope_puntos"])
+
+# ==========================================================
+# 8. GUARDADO DE PARTIDA (Fase 1)
+# ==========================================================
+# El servidor guarda la partida al cerrar cada noche, pero los datos de cada
+# personaje viven en la pantalla de su dueño. Estas dos funciones los
+# empaquetan para mandarlos al servidor y los restauran al continuar.
+
+func exportar_estado() -> Dictionary:
+	var armas := []
+	for arma in armas_inventario: armas.append(arma.a_diccionario())
+	var equipadas := []
+	for arma in armas_equipadas: equipadas.append(armas_inventario.find(arma) if arma else -1)
+	return {
+		"nivel": nivel, "experiencia": experiencia_actual, "puntos_mejora": puntos_mejora,
+		"puntos_en_stat": puntos_en_stat.duplicate(),
+		"stat_salud_maxima": stat_salud_maxima, "stat_agilidad": stat_agilidad,
+		"stat_destreza": stat_destreza, "stat_ingenieria": stat_ingenieria,
+		"stat_recoleccion": stat_recoleccion,
+		"municion": municion_reserva.duplicate(),
+		"armas": armas, "equipadas": equipadas, "slot_actual": slot_actual
+	}
+
+func importar_estado(d: Dictionary) -> void:
+	if d.is_empty(): return
+	nivel = int(d.get("nivel", 1))
+	experiencia_actual = int(d.get("experiencia", 0))
+	puntos_mejora = int(d.get("puntos_mejora", 0))
+	for k in d.get("puntos_en_stat", {}).keys(): puntos_en_stat[k] = int(d["puntos_en_stat"][k])
+	stat_salud_maxima = int(d.get("stat_salud_maxima", stat_salud_maxima))
+	stat_agilidad = float(d.get("stat_agilidad", stat_agilidad))
+	stat_destreza = float(d.get("stat_destreza", stat_destreza))
+	stat_ingenieria = float(d.get("stat_ingenieria", stat_ingenieria))
+	stat_recoleccion = float(d.get("stat_recoleccion", stat_recoleccion))
+	for tipo in d.get("municion", {}).keys(): municion_reserva[tipo] = int(d["municion"][tipo])
+
+	var armas: Array = d.get("armas", [])
+	if not armas.is_empty():
+		armas_inventario.clear()
+		for datos in armas: armas_inventario.append(ArmaData.desde_diccionario(datos))
+		armas_equipadas.fill(null)
+		var equipadas: Array = d.get("equipadas", [])
+		for i in range(mini(3, equipadas.size())):
+			var idx := int(equipadas[i])
+			if idx >= 0 and idx < armas_inventario.size():
+				equipar_en_slot(armas_inventario[idx], i)
+		arma_actual = null
+		var slot := int(d.get("slot_actual", 0))
+		if slot < 0 or slot > 2 or armas_equipadas[slot] == null:
+			slot = 0
+			for k in range(3):
+				if armas_equipadas[k] != null:
+					slot = k
+					break
+		cambiar_arma(slot)
+
+	salud_actual = stat_salud_maxima
+	actualizar_ui_vida()
+	actualizar_ui_xp()
+	actualizar_ui_municion()

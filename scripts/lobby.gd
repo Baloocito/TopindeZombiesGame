@@ -40,6 +40,8 @@ var input_contrasena_crear: LineEdit
 var input_contrasena_unirse: LineEdit
 var label_estado_sala: Label
 var boton_volver: Button
+var boton_continuar: Button
+var _continuando: bool = false
 
 func _ready():
 	boton_iniciar.hide()
@@ -95,7 +97,31 @@ func _crear_controles_nuevos():
 	boton_volver.pressed.connect(_volver_al_menu)
 	vbox.add_child(boton_volver)
 
+	# --- Continuar la última partida guardada (Fase 1) ---
+	# Solo lo ve quien tiene una partida guardada en este equipo (el anfitrión
+	# de esa partida). Los demás se unen normal y recuperan su personaje.
+	boton_continuar = Button.new()
+	vbox.add_child(boton_continuar)
+	vbox.move_child(boton_continuar, btn_host.get_index() + 1)
+	boton_continuar.pressed.connect(_on_btn_continuar_pressed)
+	var guardada := GuardadoGlobal.cargar_partida()
+	if guardada.is_empty():
+		boton_continuar.hide()
+	else:
+		var n_jugadores := maxi(1, guardada.get("jugadores", {}).size())
+		boton_continuar.text = "Continuar partida (Noche %d, %d jugador%s)" % [int(guardada.get("oleada", 1)), n_jugadores, "" if n_jugadores == 1 else "es"]
+
 	_actualizar_texto_boton_host()
+
+func _on_btn_continuar_pressed():
+	var guardada := GuardadoGlobal.cargar_partida()
+	if guardada.is_empty(): return
+	EstadoPartida.partida_a_cargar = guardada
+	cantidad_deseada = clampi(guardada.get("jugadores", {}).size(), 1, MAX_CLIENTS)
+	spin_cantidad.value = cantidad_deseada
+	_continuando = true
+	_on_btn_host_pressed()
+	_continuando = false
 
 func _actualizar_texto_boton_host():
 	btn_host.text = "Jugar Solo" if cantidad_deseada <= 1 else "Crear Partida (Host)"
@@ -117,6 +143,9 @@ func _unhandled_input(event):
 # BOTONES DE CONEXIÓN
 # ==========================================
 func _on_btn_host_pressed():
+	# Partida nueva salvo que venga de "Continuar partida".
+	if not _continuando:
+		EstadoPartida.partida_a_cargar = {}
 	var error = peer.create_server(EstadoPartida.PUERTO_RED, MAX_CLIENTS)
 	if error != OK:
 		print("Error al crear el Host: ", error)
@@ -165,6 +194,7 @@ func esconder_menu_conexion():
 	btn_host.hide()
 	btn_unirse.hide()
 	input_ip.hide()
+	if boton_continuar: boton_continuar.hide()
 	fila_cantidad.hide()
 	input_contrasena_crear.hide()
 	input_contrasena_unirse.hide()

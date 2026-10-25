@@ -21,6 +21,17 @@ var _destruida: bool = false
 func _ready():
 	if not is_in_group("barricadas"):
 		add_to_group("barricadas")
+	# El sincronizador solo le manda datos a quien ya tiene la escena Mundo
+	# cargada y recibió esta estructura. Sin esto, un jugador que todavía
+	# cargaba (o que continuaba una partida guardada) recibía datos de una
+	# estructura que aún no existía en su pantalla ("Node not found").
+	var sync := get_node_or_null("MultiplayerSynchronizer") as MultiplayerSynchronizer
+	if sync and multiplayer.is_server():
+		sync.public_visibility = false
+		var mundo = get_tree().current_scene
+		if mundo and "peers_en_mundo" in mundo:
+			for peer_id in mundo.peers_en_mundo:
+				sync.set_visibility_for(peer_id, true)
 
 # Daño desde zombies (corre en el servidor).
 func recibir_dano(cantidad: int):

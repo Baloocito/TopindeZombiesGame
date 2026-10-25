@@ -3,8 +3,9 @@
 [ext_resource type="Script" uid="uid://c6vqddrh24osb" path="res://scripts/zombie.gd" id="1_85317"]
 [ext_resource type="PackedScene" uid="uid://fcjb23b1ra3m" path="res://assets/robot/robot_run.glb" id="2_vlph1"]
 
-[sub_resource type="CylinderShape3D" id="CylinderShape3D_kewk0"]
-radius = 0.6
+[sub_resource type="CapsuleShape3D" id="CylinderShape3D_kewk0"]
+radius = 0.5
+height = 2.0
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_vlph1"]
 properties/0/path = NodePath(".:position")

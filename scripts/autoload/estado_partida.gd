@@ -56,9 +56,27 @@ var mi_id_logico: int = -1
 # ya se cerró" (su id NO está acá, y no tiene token de reconexión válido).
 var ids_iniciales: Array = []
 
+# Identidad del jugador que sobrevive a cerrar el juego (guardada en el
+# equipo). Sirve para devolverle a cada uno SU personaje al continuar una
+# partida guardada. mi_token, en cambio, es solo de esta sesión.
+const RUTA_IDENTIDAD := "user://identidad.txt"
+var id_persistente: String = ""
+
+# Partida guardada que el anfitrión eligió continuar (vacío = partida nueva).
+var partida_a_cargar: Dictionary = {}
+
 func _ready():
 	if mi_token == "":
 		mi_token = str(Time.get_ticks_usec()) + "_" + str(randi())
+	id_persistente = _cargar_o_crear_identidad()
+
+func _cargar_o_crear_identidad() -> String:
+	var existente := FileAccess.get_file_as_string(RUTA_IDENTIDAD).strip_edges()
+	if existente != "": return existente
+	var nuevo := Crypto.new().generate_random_bytes(8).hex_encode()
+	var f := FileAccess.open(RUTA_IDENTIDAD, FileAccess.WRITE)
+	if f: f.store_string(nuevo)
+	return nuevo
 
 # El servidor le informa a cada peer (nuevo o reconectado) cuál es el nombre
 # real de SU nodo de jugador bajo ContenedorJugadores.
@@ -203,7 +221,7 @@ func avisar_partida_en_curso():
 		# servidor no devolvía el personaje.
 		cliente_reentrando = false
 		mostrar_overlay_texto("Sincronizando partida…")
-		escena_actual.solicitar_sincronizacion_tardia.rpc_id(1, mi_token)
+		escena_actual.solicitar_sincronizacion_tardia.rpc_id(1, mi_token, id_persistente)
 		return
 	# Estamos en el Lobby. Si seguimos conectados mientras cargamos Mundo, el
 	# servidor nos manda los jugadores y zombies que ya existen ANTES de que
