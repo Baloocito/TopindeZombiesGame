@@ -980,6 +980,15 @@ func liberar_celda(pos: Vector3):
 	actualizar_boton_reparacion()
 
 func _unhandled_input(event):
+	if event.is_action_pressed("pausa") and menu_pausa and not menu_pausa.visible:
+		get_viewport().set_input_as_handled()
+		menu_pausa.alternar_pausa()
+		return
+	if event.is_action_pressed("iniciar_noche") and not fase_combate and boton_iniciar \
+			and boton_iniciar.is_visible_in_tree() and not boton_iniciar.disabled:
+		get_viewport().set_input_as_handled()
+		_al_presionar_iniciar()
+		return
 	if not modo_construccion or fase_combate: return
 
 	if event is InputEventScreenTouch and event.pressed:
@@ -1109,12 +1118,34 @@ func confirmar_mejora(id_arma: String):
 	var arma := arma_del_jugador(jugador, id_arma)
 	if not arma: return
 	nivel_armas[id_arma] = nivel_armas.get(id_arma, 1) + 1
+	arma.mejoras += 1
 	var bono := randf_range(0.1, 0.4) + (Balance.tier_arma(id_arma) * 0.1)
+	var texto := ""
+	var flotante := ""
 	match ["dano", "cadencia", "tamano_cargador", "tiempo_recarga"].pick_random():
-		"dano": arma.dano += max(1, int(arma.dano * bono))
-		"cadencia": arma.cadencia += arma.cadencia * bono
-		"tamano_cargador": arma.tamano_cargador += max(1, int(arma.tamano_cargador * bono))
-		"tiempo_recarga": arma.tiempo_recarga = max(0.1, arma.tiempo_recarga * (1.0 - bono * 0.5))
+		"dano":
+			var antes := arma.dano
+			arma.dano += max(1, int(arma.dano * bono))
+			texto = "Daño %d → %d (+%d)" % [antes, arma.dano, arma.dano - antes]
+			flotante = "+%d daño" % (arma.dano - antes)
+		"cadencia":
+			var antes := arma.cadencia
+			arma.cadencia += arma.cadencia * bono
+			texto = "Cadencia %.1f → %.1f (+%.1f)" % [antes, arma.cadencia, arma.cadencia - antes]
+			flotante = "+%.1f cadencia" % (arma.cadencia - antes)
+		"tamano_cargador":
+			var antes := arma.tamano_cargador
+			arma.tamano_cargador += max(1, int(arma.tamano_cargador * bono))
+			texto = "Cargador %d → %d (+%d)" % [antes, arma.tamano_cargador, arma.tamano_cargador - antes]
+			flotante = "+%d balas por cargador" % (arma.tamano_cargador - antes)
+		"tiempo_recarga":
+			var antes := arma.tiempo_recarga
+			arma.tiempo_recarga = max(0.1, arma.tiempo_recarga * (1.0 - bono * 0.5))
+			texto = "Recarga %.2f → %.2f s (−%.2f)" % [antes, arma.tiempo_recarga, antes - arma.tiempo_recarga]
+			flotante = "−%.2f s recarga" % (antes - arma.tiempo_recarga)
+	# Solo en mi pantalla: qué subió exactamente.
+	mostrar_aviso("%s: %s" % [arma.nombre_con_nivel(), texto])
+	EstiloUI.texto_flotante(jugador.global_position, flotante, Color("#4ade80"))
 	jugador.actualizar_ui_municion()
 	_refrescar_menu_si_abierto(menu_ensamblaje, menus.actualizar_lista_ensamblaje)
 

@@ -26,6 +26,23 @@ func _agregar_opcion_ps1():
 		titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	c.toggled.connect(func(v): PS1.alternar(v))
 	panel_opciones.add_child(c)
+	var controles := Button.new()
+	controles.text = "Controles"
+	controles.position = Vector2(256, 196)
+	controles.custom_minimum_size = Vector2(240, 52)
+	controles.pressed.connect(func(): _menu_controles = MenuControles.abrir(self))
+	EstiloUI.agregar_rebote(controles)
+	panel_opciones.add_child(controles)
+
+var _menu_controles: MenuControles
+
+# Esc / Start cierra la pausa (y primero el panel de opciones si está abierto).
+func _unhandled_input(event: InputEvent):
+	if not visible or is_instance_valid(_menu_controles): return
+	if event.is_action_pressed("pausa"):
+		get_viewport().set_input_as_handled()
+		if panel_opciones and panel_opciones.visible: panel_opciones.visible = false
+		else: alternar_pausa()
 
 func alternar_pausa():
 	visible = !visible
@@ -33,7 +50,8 @@ func alternar_pausa():
 	# Lógica inteligente: 
 	# Si es Online, NO detenemos el tiempo del servidor (get_tree().paused = false)
 	# Si es un juego local solitario, pausamos todo.
-	var es_online = multiplayer.has_multiplayer_peer()
+	# Jugando solo (OfflineMultiplayerPeer) sí se detiene el tiempo.
+	var es_online = multiplayer.has_multiplayer_peer() and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer)
 	
 	if visible:
 		if not es_online:

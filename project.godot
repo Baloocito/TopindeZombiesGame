@@ -21,6 +21,7 @@ Balance="*res://scripts/autoload/balance.gd"
 GuardadoGlobal="*uid://cx72602j8u0yg"
 EstadoPartida="*uid://4o0ke8wvbq5h"
 PS1="*res://scripts/autoload/ps1.gd"
+Controles="*res://scripts/autoload/controles.gd"
 
 [display]
 

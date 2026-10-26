@@ -17,13 +17,18 @@ class_name ArmaData
 
 @export var dano_area: int = 0          # Ballesta y Lanzagranadas (pendiente: aún no lo aplica bala.gd)
 @export var penetra_enemigos: bool = false
+@export var mejoras: int = 0           # veces que se forjó en la Mesa de Trabajo
+
+# "Escopeta Vieja +2" si ya se mejoró.
+func nombre_con_nivel() -> String:
+	return nombre + (" +%d" % mejoras if mejoras > 0 else "")
 
 # Para mandar un arma por RPC (un Resource no viaja por red).
 func a_diccionario() -> Dictionary:
 	return {"id": id, "nombre": nombre, "tipo_municion": tipo_municion, "dano": dano,
 		"cadencia": cadencia, "tamano_cargador": tamano_cargador, "tiempo_recarga": tiempo_recarga,
 		"balas_por_disparo": balas_por_disparo, "dispersion": dispersion,
-		"dano_area": dano_area, "penetra_enemigos": penetra_enemigos}
+		"dano_area": dano_area, "penetra_enemigos": penetra_enemigos, "mejoras": mejoras}
 
 static func desde_diccionario(d: Dictionary) -> ArmaData:
 	var a := ArmaData.new()

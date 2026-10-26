@@ -73,6 +73,12 @@ func _unhandled_input(event):
 			return 
 	# =========================================================
 
+	# PC en modo teclado y ratón: los joysticks de pantalla no se usan (el
+	# ratón apunta y dispara). Ver Opciones > Controles.
+	if Controles.modo_raton and not EstiloUI.tactil_forzado and not DisplayServer.is_touchscreen_available():
+		if dedo_indice != -1: resetear_joystick()
+		return
+
 	var toque_id = -1
 	var pos_toque = Vector2.ZERO
 	

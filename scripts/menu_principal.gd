@@ -27,7 +27,52 @@ func _on_boton_ranking_pressed():
 	
 	mostrar_aviso(texto_estadisticas)
 func _on_boton_opciones_pressed():
-	mostrar_aviso("MENÚ DE OPCIONES")
+	_abrir_opciones()
+
+# Opciones: controles y estilo retro (lo mismo que en Pausa > Opciones).
+func _abrir_opciones():
+	var capa := CanvasLayer.new()
+	capa.layer = 40
+	add_child(capa)
+	var fondo := ColorRect.new()
+	fondo.color = Color(0, 0, 0, 0.7)
+	fondo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	capa.add_child(fondo)
+	var centro := CenterContainer.new()
+	centro.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fondo.add_child(centro)
+	var tarjeta := PanelContainer.new()
+	tarjeta.theme_type_variation = "PanelVidrio"
+	centro.add_child(tarjeta)
+	var margen := MarginContainer.new()
+	for lado in ["left", "right", "top", "bottom"]: margen.add_theme_constant_override("margin_" + lado, 24)
+	tarjeta.add_child(margen)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	margen.add_child(col)
+	var t := Label.new()
+	t.theme_type_variation = "Titulo"
+	t.text = "OPCIONES"
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(t)
+	var ps1 := CheckButton.new()
+	ps1.text = "Estilo retro PS1"
+	ps1.button_pressed = PS1.activo
+	ps1.toggled.connect(func(v): PS1.alternar(v))
+	col.add_child(ps1)
+	var controles := Button.new()
+	controles.text = "Controles"
+	controles.custom_minimum_size = Vector2(280, 54)
+	controles.pressed.connect(func(): MenuControles.abrir(self))
+	col.add_child(controles)
+	var cerrar := Button.new()
+	cerrar.text = "Cerrar"
+	cerrar.theme_type_variation = "BotonPrimario"
+	cerrar.custom_minimum_size = Vector2(280, 54)
+	cerrar.pressed.connect(capa.queue_free)
+	col.add_child(cerrar)
+	for b in [controles, cerrar]: EstiloUI.agregar_rebote(b)
+	controles.grab_focus.call_deferred()
 
 func _on_boton_salir_pressed():
 	# Cierra la aplicación/juego

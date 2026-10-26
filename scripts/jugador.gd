@@ -133,6 +133,48 @@ func _ready():
 			cambiar_arma(0)
 
 
+# ----------------------------------------------------------
+# TECLADO, RATÓN Y MANDO (Opciones > Controles)
+# ----------------------------------------------------------
+var _ultimo_raton_ms := -1
+var _ultimo_mando_ms := 0
+
+func _input(event: InputEvent) -> void:
+	if not is_multiplayer_authority(): return
+	if event is InputEventMouseMotion: _ultimo_raton_ms = Time.get_ticks_msec()
+	elif event is InputEventJoypadMotion and absf(event.axis_value) > 0.3: _ultimo_mando_ms = Time.get_ticks_msec()
+	elif event is InputEventJoypadButton: _ultimo_mando_ms = Time.get_ticks_msec()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not is_multiplayer_authority() or esta_caido: return
+	if event.is_action_pressed("recargar"): recargar()
+	elif event.is_action_pressed("arma_siguiente"): ciclo_arma_rapido()
+	elif event.is_action_pressed("arma_anterior"): _ciclo_arma_atras()
+	elif event.is_action_pressed("arma_1"): equipar_arma_directa(0)
+	elif event.is_action_pressed("arma_2"): equipar_arma_directa(1)
+	elif event.is_action_pressed("arma_3"): equipar_arma_directa(2)
+
+func _ciclo_arma_atras():
+	var s := slot_actual
+	for i in range(3):
+		s = (s + 2) % 3
+		if armas_equipadas[s] != null:
+			cambiar_arma(s)
+			return
+
+func _usa_raton() -> bool:
+	return Controles.modo_raton and not EstiloUI.tactil_forzado and _ultimo_raton_ms > _ultimo_mando_ms
+
+func _raton_sobre_interfaz() -> bool:
+	return get_viewport().gui_get_hovered_control() != null
+
+# Punto del suelo (a la altura del pecho) bajo el cursor.
+func _punto_del_raton():
+	var cam := get_viewport().get_camera_3d()
+	if not cam: return null
+	var pos := get_viewport().get_mouse_position()
+	return Plane(Vector3.UP, global_position.y + 1.0).intersects_ray(cam.project_ray_origin(pos), cam.project_ray_normal(pos))
+
 func set_can_fire(valor: bool) -> void:
 	can_fire_fase = valor
 
@@ -170,17 +212,29 @@ func _physics_process(delta: float) -> void:
 
 		var aim_dir := Input.get_vector("apuntar_izq", "apuntar_der", "apuntar_arriba", "apuntar_abajo")
 
+		# ¿Hacia dónde apunto? Stick (táctil o mando) o, en PC, el cursor del
+		# ratón si fue lo último que se movió.
+		var angulo_objetivo = null
 		if aim_dir.length() > 0.1:
-			var angulo_objetivo = atan2(aim_dir.x, aim_dir.y)
+			angulo_objetivo = atan2(aim_dir.x, aim_dir.y)
+		elif _usa_raton():
+			var punto = _punto_del_raton()
+			if punto != null:
+				var d: Vector3 = punto - global_position
+				if Vector2(d.x, d.z).length() > 0.3:
+					angulo_objetivo = atan2(d.x, d.z)
+		if angulo_objetivo != null:
 			rotation.y = lerp_angle(rotation.y, angulo_objetivo, 15.0 * delta)
+		var alineado: bool = angulo_objetivo == null or absf(angle_difference(rotation.y, angulo_objetivo)) < ANGULO_MAX_DISPARO
 
-			var alineado = absf(angle_difference(rotation.y, angulo_objetivo)) < ANGULO_MAX_DISPARO
-			# Táctil: dispara quien empuja el joystick más allá del anillo rojo
-			# (acción "disparar_tactil"). Mando/otros: como antes, stick > 0.6.
-			var quiere_disparar = (InputMap.has_action("disparar_tactil") and Input.is_action_pressed("disparar_tactil")) \
-				or (not DisplayServer.is_touchscreen_available() and aim_dir.length() > 0.6)
-			if quiere_disparar and alineado and can_fire_fase:
-				intentar_disparar()
+		# Disparo: joystick táctil más allá del anillo rojo, la acción
+		# "disparar" (clic / RT, ver Opciones > Controles) o el stick derecho
+		# a fondo en el mando si esa opción está activa.
+		var quiere_disparar = (InputMap.has_action("disparar_tactil") and Input.is_action_pressed("disparar_tactil")) \
+			or (Input.is_action_pressed("disparar") and not _raton_sobre_interfaz()) \
+			or (Controles.auto_disparo_mando and not DisplayServer.is_touchscreen_available() and aim_dir.length() > 0.6)
+		if quiere_disparar and alineado and can_fire_fase:
+			intentar_disparar()
 
 		# --- NUEVO: reanimación por proximidad ---
 		# Si estoy vivo y hay un compañero derribado cerca, tras quedarme
@@ -367,9 +421,25 @@ func actualizar_ui_vida():
 		else:
 			lbl_salud_num.text = "%s / %s" % [salud_actual, stat_salud_maxima]
 		barra_salud.max_value = stat_salud_maxima
+		_mostrar_bono_vida()
 		var valor_mostrado = 0 if esta_caido else salud_actual
 		var tween = create_tween()
 		tween.tween_property(barra_salud, "value", float(valor_mostrado), 0.2).set_trans(Tween.TRANS_SINE)
+
+# Al lado de la vida, en verde: cuánta vida máxima se ganó con los niveles.
+func _mostrar_bono_vida():
+	var fila = lbl_salud_num.get_parent()
+	var lbl := fila.get_node_or_null("LblBonoVida") as Label
+	if not lbl:
+		lbl = Label.new()
+		lbl.name = "LblBonoVida"
+		lbl.theme_type_variation = lbl_salud_num.theme_type_variation
+		lbl.add_theme_color_override("font_color", Color("#4ade80"))
+		lbl.add_theme_font_size_override("font_size", maxi(12, lbl_salud_num.get_theme_font_size("font_size") - 3))
+		fila.add_child(lbl)
+	var bono := stat_salud_maxima - int(Balance.stat("salud")["base"])
+	lbl.text = "(+%d)" % bono
+	lbl.visible = bono > 0 and not esta_caido
 
 func actualizar_ui_xp():
 	if not is_multiplayer_authority(): return
@@ -397,7 +467,7 @@ func actualizar_ui_municion():
 
 		var arma = armas_equipadas[i]
 		if arma != null:
-			if lbl_nombre: lbl_nombre.text = arma.nombre
+			if lbl_nombre: lbl_nombre.text = arma.nombre_con_nivel()
 
 			var balas_render = balas_en_cargador if i == slot_actual else cargadores_equipados[i]
 			var tipo_ammo = arma.tipo_municion
@@ -703,6 +773,10 @@ func mejorar_estadistica(estadistica: String):
 	puntos_en_stat[estadistica] += 1
 	puntos_mejora -= 1
 	actualizar_ui_xp()
+	var textos := {"salud": "+%d vida máx." % int(por_punto), "agilidad": "+%.1f velocidad" % float(por_punto),
+		"destreza": "+%d%% destreza" % int(round(float(por_punto) * 100)), "ingenieria": "+%.1f ingeniería" % float(por_punto),
+		"recoleccion": "+%.1f m imán" % float(por_punto)}
+	EstiloUI.texto_flotante(global_position, textos.get(estadistica, "+1"), Color("#4ade80"))
 
 func stat_en_tope(estadistica: String) -> bool:
 	return puntos_en_stat.get(estadistica, 0) >= int(Balance.stat(estadistica)["tope_puntos"])

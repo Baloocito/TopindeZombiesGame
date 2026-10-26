@@ -57,7 +57,7 @@ func actualizar_lista_armeria():
 	for arma in jugador.armas_inventario:
 		var fila = HBoxContainer.new()
 		var btn_nombre = Button.new()
-		btn_nombre.text = ("– " if arma_inspeccionada == arma else "+ ") + arma.nombre
+		btn_nombre.text = ("– " if arma_inspeccionada == arma else "+ ") + arma.nombre_con_nivel()
 		btn_nombre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn_nombre.add_theme_font_size_override("font_size", 18)
 		btn_nombre.pressed.connect(func():
@@ -83,10 +83,8 @@ func actualizar_lista_armeria():
 		menu.add_child(fila)
 
 		if arma_inspeccionada == arma:
-			var lbl_datos = Label.new()
-			lbl_datos.text = "Daño: %d\nCadencia: %.1f bps\nCargador: %d balas\nRecarga: %.2f s\nMunición: %s" % [arma.dano, arma.cadencia, arma.tamano_cargador, arma.tiempo_recarga, arma.tipo_municion]
-			lbl_datos.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			lbl_datos.modulate = Color(0.7, 1.0, 1.0)
+			# Entre paréntesis, cuánto subió cada valor desde el arma original.
+			var lbl_datos := Bono.etiqueta("[color=#b3ffff]%s[/color]" % Bono.arma(arma))
 			menu.add_child(lbl_datos)
 		_espacio(menu, 10)
 
@@ -215,24 +213,25 @@ func actualizar_lista_nivel():
 	if jugador.puntos_mejora > 0: lbl_puntos.modulate = Color(1, 1, 0)
 	menu.add_child(lbl_puntos)
 
+	# Valor actual y, entre paréntesis, cuánto se ganó desde el inicio.
+	var base := func(id): return float(Balance.stat(id)["base"])
+	var por_punto := func(id): return float(Balance.stat(id)["por_punto"])
 	var stats_ui = [
-		{"id": "salud", "nombre": "Salud Máxima", "valor": str(jugador.stat_salud_maxima) + " HP"},
-		{"id": "agilidad", "nombre": "Agilidad", "valor": str(jugador.stat_agilidad).pad_decimals(1) + " m/s"},
-		{"id": "destreza", "nombre": "Destreza", "valor": str(int(round(jugador.stat_destreza * 100))) + "%"},
-		{"id": "ingenieria", "nombre": "Ingeniería", "valor": "x" + str(jugador.stat_ingenieria).pad_decimals(1)},
-		{"id": "recoleccion", "nombre": "Imán de Oro", "valor": str(jugador.stat_recoleccion).pad_decimals(1) + " m"}
+		{"id": "salud", "nombre": "Salud Máxima", "valor": Bono.bb(jugador.stat_salud_maxima, base.call("salud"), 0, " HP"), "paso": "+%d HP" % int(por_punto.call("salud"))},
+		{"id": "agilidad", "nombre": "Agilidad", "valor": Bono.bb(jugador.stat_agilidad, base.call("agilidad"), 1, " m/s"), "paso": "+%.1f" % por_punto.call("agilidad")},
+		{"id": "destreza", "nombre": "Destreza", "valor": Bono.bb(jugador.stat_destreza * 100.0, base.call("destreza") * 100.0, 0, "%"), "paso": "+%d%%" % int(round(por_punto.call("destreza") * 100))},
+		{"id": "ingenieria", "nombre": "Ingeniería", "valor": "x" + Bono.bb(jugador.stat_ingenieria, base.call("ingenieria"), 1), "paso": "+%.1f" % por_punto.call("ingenieria")},
+		{"id": "recoleccion", "nombre": "Imán de Oro", "valor": Bono.bb(jugador.stat_recoleccion, base.call("recoleccion"), 1, " m"), "paso": "+%.1f m" % por_punto.call("recoleccion")}
 	]
 	for stat in stats_ui:
 		var fila = HBoxContainer.new()
 		fila.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var lbl_stat = Label.new()
 		var en_tope: bool = jugador.stat_en_tope(stat["id"])
-		lbl_stat.text = stat["nombre"] + "\n" + stat["valor"] + ("  (MÁX)" if en_tope else "")
-		lbl_stat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var lbl_stat := Bono.etiqueta(stat["nombre"] + "\n" + stat["valor"] + ("  (MÁX)" if en_tope else ""), false)
 		fila.add_child(lbl_stat)
 		var btn_mejorar = Button.new()
-		btn_mejorar.text = " + "
-		btn_mejorar.custom_minimum_size = Vector2(50, 50)
+		btn_mejorar.text = "MÁX" if en_tope else stat["paso"]
+		btn_mejorar.custom_minimum_size = Vector2(84, 50)
 		btn_mejorar.disabled = jugador.puntos_mejora <= 0 or en_tope
 		btn_mejorar.pressed.connect(func():
 			jugador.mejorar_estadistica(stat["id"])
@@ -271,13 +270,12 @@ func actualizar_lista_ensamblaje():
 		var costo_mejorar: int = m.costo_mejora_arma(clave)
 		var arma_poseida = m.arma_del_jugador(jugador, clave)
 
-		var lbl_info = Label.new()
-		var texto_info = "► %s (x%d Planos)\n" % [datos["nombre"], conteo_planos[clave]]
+		var texto_info = "► %s (x%d Planos)\n" % [arma_poseida.nombre_con_nivel() if arma_poseida else datos["nombre"], conteo_planos[clave]]
 		if arma_poseida:
-			texto_info += "Nivel: %d | Daño: %d" % [m.nivel_armas.get(clave, 1), arma_poseida.dano]
+			texto_info += Bono.arma(arma_poseida)
 		else:
 			texto_info += "Estado: No Ensamblada"
-		lbl_info.text = texto_info
+		var lbl_info := Bono.etiqueta(texto_info, false)
 		menu.add_child(lbl_info)
 
 		var btn = Button.new()
