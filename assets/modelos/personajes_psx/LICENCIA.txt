@@ -1,0 +1,4 @@
+Personajes PSX (pack "Characters_psx" v1.2, 117 civiles + 21 killers/monstruos, esqueleto Mixamo).
+Licencia: PENDIENTE DE CONFIRMAR. Agregar aquí el enlace de la página y el texto de la licencia.
+Solo se copió al juego la selección de data/personajes.json, con texturas reducidas a 256 px.
+El pack completo quedó en assets/modelos/_fuentes/personajes_psx_1.2 (fuera de Git).

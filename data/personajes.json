@@ -1,0 +1,59 @@
+{
+ "_nota": "Modelos por rol (assets/modelos/personajes_psx, texturas a 256 px). Todos usan el esqueleto de Mixamo (mixamorig_*), así que cualquier animación de Mixamo les sirve. Las animaciones van en assets/animaciones/mixamo. Excluidos a propósito: el payaso (parecido a un personaje de cine), la máscara de cerdo, camisetas con marcas o bandas, el traje amarillo con cara parecida a un actor y los modelos de bailarina/lencería.",
+ "roles": {
+  "protagonistas": [
+   "Character_Male_57",
+   "Character_Sheriff_N",
+   "Character_35_Female",
+   "Character_45_Female"
+  ],
+  "basico": [
+   "Character_29",
+   "Character_30",
+   "Character_Male_42",
+   "Character_Male_46",
+   "Character_Male_47",
+   "Character_Male_48",
+   "Character_Male_52",
+   "Character_Male_56",
+   "Character_29_Female",
+   "Character_33_Female",
+   "Character_37_Female",
+   "Character_38_Female",
+   "Character_43_Female"
+  ],
+  "corredor": [
+   "Character_25_Doctor",
+   "Character_26_Doctor",
+   "Character_23_Female_Doctor",
+   "Character_Male_53"
+  ],
+  "explosivo": [
+   "Character_28_HM",
+   "Character_27_Female_HM",
+   "Character_28_Female_HM"
+  ],
+  "tanque": [
+   "Character_Killer",
+   "Character_Killer_03",
+   "Character_Killer_04"
+  ],
+  "acechador": [
+   "Character_Killer_01",
+   "Character_Killer_02",
+   "Character_Killer_06"
+  ],
+  "guardian": [
+   "Character_Monster_08"
+  ],
+  "mosca_titan": [
+   "Character_Monster_06"
+  ],
+  "mosca_titan_plus": [
+   "Character_Monster_06"
+  ],
+  "hospedero": [
+   "Character_Monster_07"
+  ]
+ }
+}

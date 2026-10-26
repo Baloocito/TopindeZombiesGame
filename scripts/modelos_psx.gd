@@ -55,3 +55,68 @@ static func objeto(nombre: String, tamano: float) -> Node3D:
 	malla.position = Vector3(-centro.x, -caja.position.y, -centro.z) * escala
 	raiz.add_child(malla)
 	return raiz
+
+# ----------------------------------------------------------
+# PERSONAJES (assets/modelos/personajes_psx, roles en data/personajes.json)
+# ----------------------------------------------------------
+const RUTA_PERSONAJES := "res://assets/modelos/personajes_psx/"
+const ALTO_PERSONAJE := 1.8
+static var _roles: Dictionary = {}
+
+static func roles() -> Dictionary:
+	if _roles.is_empty():
+		var d = JSON.parse_string(FileAccess.get_file_as_string("res://data/personajes.json"))
+		if typeof(d) == TYPE_DICTIONARY: _roles = d.get("roles", {})
+	return _roles
+
+# Un modelo del rol (al azar si hay varios; `indice` >= 0 elige uno fijo).
+static func nombre_para_rol(rol: String, indice: int = -1) -> String:
+	var lista: Array = roles().get(rol, [])
+	if lista.is_empty(): return ""
+	return lista[indice % lista.size()] if indice >= 0 else lista.pick_random()
+
+# Instancia el personaje con su textura, escalado a ALTO_PERSONAJE y mirando
+# hacia -Z. Las animaciones de Mixamo se le agregan aparte (mismo esqueleto).
+static func personaje(nombre: String) -> Node3D:
+	var escena = load(RUTA_PERSONAJES + "modelos/" + nombre + ".fbx")
+	if not escena: return Node3D.new()
+	var p := escena.instantiate() as Node3D
+	var tex = load(RUTA_PERSONAJES + "modelos/" + nombre + ".png")
+	var caja := AABB()
+	var primera := true
+	for m in p.find_children("*", "MeshInstance3D", true, false):
+		var mat := StandardMaterial3D.new()
+		mat.albedo_texture = tex
+		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		(m as MeshInstance3D).material_override = mat
+		var b: AABB = (m as MeshInstance3D).get_aabb()
+		caja = b if primera else caja.merge(b)
+		primera = false
+	# Medida real del modelo: una malla con piel se dibuja en el espacio del
+	# esqueleto (pose de reposo × matriz de unión), no en el de su nodo.
+	var alto := caja.size.y
+	var piso := caja.position.y
+	var mallas := p.find_children("*", "MeshInstance3D", true, false)
+	var esq := p.find_child("Skeleton3D", true, false) as Skeleton3D
+	if esq and not mallas.is_empty() and (mallas[0] as MeshInstance3D).skin:
+		var mi := mallas[0] as MeshInstance3D
+		var piel := mi.skin
+		var hueso := piel.get_bind_bone(0)
+		if hueso < 0: hueso = esq.find_bone(piel.get_bind_name(0))
+		if hueso >= 0:
+			var t := Transform3D()
+			var n: Node = esq
+			while n and n != p:
+				t = (n as Node3D).transform * t
+				n = n.get_parent()
+			var en_p: AABB = (t * esq.get_bone_global_rest(hueso) * piel.get_bind_pose(0)) * mi.get_aabb()
+			alto = en_p.size.y
+			piso = en_p.position.y
+	var raiz := Node3D.new()
+	raiz.name = "Personaje"
+	var escala := ALTO_PERSONAJE / maxf(0.01, alto)
+	p.scale = Vector3.ONE * escala
+	p.position = Vector3(0, -piso * escala, 0)
+	p.rotation.y = PI
+	raiz.add_child(p)
+	return raiz
