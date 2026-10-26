@@ -8,6 +8,24 @@ func _ready():
 		panel_opciones.visible = false 
 	for b in $VBoxContainer.get_children():
 		if b is BaseButton: EstiloUI.agregar_rebote(b)
+	_agregar_opcion_ps1()
+
+# Opciones > Estilo retro PS1 (se guarda en user://ajustes.cfg).
+func _agregar_opcion_ps1():
+	if not panel_opciones: return
+	var c := CheckButton.new()
+	c.name = "OpcionPS1"
+	c.text = "Estilo retro PS1"
+	c.button_pressed = PS1.activo
+	c.position = Vector2(246, 130)
+	c.custom_minimum_size = Vector2(260, 52)
+	var titulo := panel_opciones.get_node_or_null("Label") as Label
+	if titulo:
+		titulo.text = "OPCIONES"
+		titulo.position = Vector2(192, 40)
+		titulo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	c.toggled.connect(func(v): PS1.alternar(v))
+	panel_opciones.add_child(c)
 
 func alternar_pausa():
 	visible = !visible

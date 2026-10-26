@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 Balance="*res://scripts/autoload/balance.gd"
 GuardadoGlobal="*uid://cx72602j8u0yg"
 EstadoPartida="*uid://4o0ke8wvbq5h"
+PS1="*res://scripts/autoload/ps1.gd"
 
 [display]
 
@@ -110,3 +111,10 @@ theme/custom="res://ui/tema.tres"
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true
+
+[shader_globals]
+
+ps1_resolucion={
+"type": "vec2",
+"value": Vector2(480, 270)
+}

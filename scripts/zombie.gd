@@ -74,8 +74,12 @@ func _aplicar_aspecto():
 	mat.albedo_color = Color(datos["color"], 0.45)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	for m in modelo.find_children("*", "MeshInstance3D", true, false):
-		(m as MeshInstance3D).material_overlay = mat
+	# Con el estilo PS1 el color va por un parámetro del material (un
+	# overlay no tiembla junto con los vértices y se vería despegado).
+	PS1.aplicar_tinte(modelo, Color(datos["color"]), 0.45)
+	if not PS1.activo:
+		for m in modelo.find_children("*", "MeshInstance3D", true, false):
+			(m as MeshInstance3D).material_overlay = mat
 	# La Mosca Titán lleva una placa al frente: la armadura que obliga a flanquear.
 	if tipo_zombie.begins_with("mosca_titan"):
 		var placa := MeshInstance3D.new()

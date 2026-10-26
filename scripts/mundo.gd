@@ -598,6 +598,7 @@ func iniciar_oleada_en_red():
 		$GeneradorZombies.iniciar_generacion()
 
 func cambiar_fase_ui(es_combate: bool):
+	PS1.poner_noche_mundo(es_combate)
 	var ui_dia = [hud_dia_inferior, hud_dia_lateral]
 	var ui_noche = [hud_combate]
 
