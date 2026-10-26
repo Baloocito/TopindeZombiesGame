@@ -113,6 +113,11 @@ func _ready():
 	for tipo in municion_reserva.keys(): municion_reserva[tipo] = int(municion_reserva[tipo])
 	salud_actual = stat_salud_maxima
 
+	# Arma visible: todos empiezan con la pistola; los cambios viajan por RPC
+	# un momento después de aparecer (cuando el nodo ya existe en todas las pantallas).
+	arma_visual_en_red("Pistol_variant_two")
+	get_tree().create_timer(1.5).timeout.connect(func(): _arma_visual_en_red_lista = true)
+
 	# Si tú eres el dueño absoluto de este clon específico:
 	if is_multiplayer_authority():
 		actualizar_ui_vida()
@@ -215,6 +220,40 @@ func cambiar_arma(slot: int):
 	esta_recargando = false
 	temporizador_disparo = 1.0
 	actualizar_ui_municion()
+	# Al aparecer, el nodo todavía no existe en las otras pantallas: ahí solo
+	# se dibuja local (todos empiezan con la pistola, ver _ready).
+	if is_multiplayer_authority() and _arma_visual_en_red_lista:
+		arma_visual_en_red.rpc(_modelo_de_arma(arma_actual))
+	else:
+		arma_visual_en_red(_modelo_de_arma(arma_actual))
+
+# ----------------------------------------------------------
+# ARMA EN LA MANO (modelos del PSX Asset Pack 3)
+# ----------------------------------------------------------
+var _arma_visual_en_red_lista := false
+func _modelo_de_arma(arma: ArmaData) -> String:
+	if not arma: return ""
+	match arma.tipo_municion:
+		"Pesada": return "Shotgun"
+		"Energia": return "Lower_poly_pistol_variant"
+	return "Pistol_variant_two"
+
+# Todas las pantallas ven qué arma lleva cada jugador.
+@rpc("any_peer", "call_local", "reliable")
+func arma_visual_en_red(modelo: String):
+	var remitente := multiplayer.get_remote_sender_id()
+	if remitente != 0 and remitente != get_multiplayer_authority(): return
+	var vieja := get_node_or_null("ArmaVisual")
+	if vieja: vieja.free()
+	if modelo == "": return
+	var largo := 1.1 if modelo == "Shotgun" else 0.55
+	var arma := ModelosPSX.objeto(modelo, largo)
+	arma.name = "ArmaVisual"
+	# El jugador mira hacia +Z: el arma va a la derecha, a la altura del pecho.
+	arma.position = Vector3(-0.38, 0.95, 0.45 + largo * 0.3)
+	add_child(arma)
+	if modelo == "Lower_poly_pistol_variant":
+		PS1.aplicar_tinte(arma, Color(0.3, 0.8, 1.0), 0.35)
 
 func equipar_arma_directa(indice_slot: int):
 	if indice_slot >= 0 and indice_slot < armas_equipadas.size():

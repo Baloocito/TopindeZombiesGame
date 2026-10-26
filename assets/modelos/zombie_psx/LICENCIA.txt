@@ -1,0 +1,3 @@
+Zombie 2 — del mismo autor que PSX Asset Pack 3 (itch.io).
+Licencia: CC0 (dominio público), según indica Xiombo. Agregar aquí el enlace exacto.
+Modelo: 414 triángulos, esqueleto de 25 huesos, animación "Lord RowanAction" (4,9 s).

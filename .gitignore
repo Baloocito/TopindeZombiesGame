@@ -10,3 +10,8 @@ export_credentials.cfg
 *.keystore
 *.jks
 .DS_Store
+
+# Archivos fuente de modelos (.blend, .fbx): no se versionan, Godot los ignora (.gdignore)
+assets/modelos/_fuentes/
+*.blend1
+.DS_Store

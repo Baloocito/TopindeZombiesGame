@@ -13,6 +13,7 @@ extends Node
 # Funciona igual con los modelos que agreguemos después (packs low-poly).
 
 const SHADER := preload("res://assets/ps1/ps1.gdshader")
+const SHADER_DOBLE := preload("res://assets/ps1/ps1_doble_cara.gdshader")
 const SHADER_PANTALLA := preload("res://assets/ps1/ps1_pantalla.gdshader")
 const RUTA_AJUSTES := "user://ajustes.cfg"
 const LINEAS := 270.0             # alto de la imagen virtual
@@ -82,7 +83,7 @@ func _convertible(m: Material) -> bool:
 func _version_ps1(m: BaseMaterial3D) -> ShaderMaterial:
 	if _cache.has(m): return _cache[m]
 	var s := ShaderMaterial.new()
-	s.shader = SHADER
+	s.shader = SHADER_DOBLE if m.cull_mode == BaseMaterial3D.CULL_DISABLED else SHADER
 	s.set_shader_parameter("albedo", m.albedo_color)
 	if m.albedo_texture:
 		s.set_shader_parameter("textura", m.albedo_texture)
@@ -96,7 +97,8 @@ func _version_ps1(m: BaseMaterial3D) -> ShaderMaterial:
 	_cache[m] = s
 	return s
 
-func convertir(n: MeshInstance3D):
+# Sin tipo en el parámetro: llega diferido y el nodo pudo liberarse antes.
+func convertir(n):
 	if not is_instance_valid(n) or not activo or n.is_in_group("sin_ps1"): return
 	if n.material_override:
 		if _convertible(n.material_override):
@@ -105,7 +107,7 @@ func convertir(n: MeshInstance3D):
 		return
 	if not n.mesh: return
 	for i in n.mesh.get_surface_count():
-		var m := n.get_surface_override_material(i)
+		var m: Material = n.get_surface_override_material(i)
 		if not m: m = n.mesh.surface_get_material(i)
 		if m and _convertible(m):
 			n.set_meta("ps1_sup_%d" % i, n.get_surface_override_material(i))
@@ -130,7 +132,7 @@ func aplicar_tinte(raiz: Node, color: Color, intensidad: float):
 # ----------------------------------------------------------
 # SOMBRA DE MANCHA (como en los juegos de la época)
 # ----------------------------------------------------------
-func _agregar_sombra(cuerpo: Node3D):
+func _agregar_sombra(cuerpo):
 	if not is_instance_valid(cuerpo) or cuerpo.has_node("SombraPS1"): return
 	if "tipo_zombie" in cuerpo and cuerpo.tipo_zombie == "nodo": return
 	if not _sombra_malla:
@@ -165,7 +167,7 @@ func _agregar_sombra(cuerpo: Node3D):
 # ----------------------------------------------------------
 # MUNDO: filtro de pantalla, niebla y suelo
 # ----------------------------------------------------------
-func _preparar_mundo(mundo: Node3D):
+func _preparar_mundo(mundo):
 	if not is_instance_valid(mundo): return
 	# Filtro de pantalla, debajo de la interfaz (que está en la capa 1).
 	_filtro = CanvasLayer.new()

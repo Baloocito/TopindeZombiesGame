@@ -19,11 +19,19 @@ func configurar(tipo: String, cantidad: int):
 	cantidad_balas = cantidad
 	if is_inside_tree(): _aplicar_color()
 
+const MODELOS := {"Ligera": "Ammo_box_9mm", "Pesada": "Ammo_box", "Energia": "Open_ammo_box_9mm"}
+
+# Modelo según el tipo de munición (PSX Asset Pack 3), con un toque de color.
 func _aplicar_color():
-	var material := StandardMaterial3D.new()
-	material.albedo_color = COLORES.get(tipo_municion, Color.WHITE)
+	var vieja := get_node_or_null("Modelo")
+	if vieja: vieja.free()
+	var modelo := ModelosPSX.objeto(MODELOS.get(tipo_municion, "Ammo_box_9mm"), 0.75)
 	if has_node("MeshInstance3D"):
-		$MeshInstance3D.material_override = material
+		$MeshInstance3D.visible = false
+		modelo.position.y = $MeshInstance3D.position.y - 0.2
+	add_child(modelo)
+	if tipo_municion == "Energia":
+		PS1.aplicar_tinte(modelo, COLORES["Energia"], 0.4)
 
 func al_recoger_local(cuerpo: Node3D) -> void:
 	if cuerpo.has_method("recoger_municion"):

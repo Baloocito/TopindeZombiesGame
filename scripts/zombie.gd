@@ -69,6 +69,11 @@ func _aplicar_aspecto():
 		var giro := cristal.create_tween().set_loops()
 		giro.tween_property(cristal, "rotation:y", TAU, 2.0).from(0.0)
 		return
+	# Modelo animado (assets/modelos/zombie_psx). La caminata va más rápida
+	# en los tipos rápidos; el tipo se conoce en todas las pantallas.
+	if modelo and modelo.get_child_count() == 0:
+		var vel_base := float(datos.get("velocidad", 1.8))
+		modelo.add_child(ModelosPSX.zombie(clampf(vel_base / 1.8, 0.7, 2.4)))
 	if not datos.has("color") or not modelo: return
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(datos["color"], 0.45)
@@ -76,7 +81,7 @@ func _aplicar_aspecto():
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	# Con el estilo PS1 el color va por un parámetro del material (un
 	# overlay no tiembla junto con los vértices y se vería despegado).
-	PS1.aplicar_tinte(modelo, Color(datos["color"]), 0.45)
+	PS1.aplicar_tinte(modelo, Color(datos["color"]), 0.4 if Balance.es_jefe(tipo_zombie) else 0.3)
 	if not PS1.activo:
 		for m in modelo.find_children("*", "MeshInstance3D", true, false):
 			(m as MeshInstance3D).material_overlay = mat
@@ -84,9 +89,9 @@ func _aplicar_aspecto():
 	if tipo_zombie.begins_with("mosca_titan"):
 		var placa := MeshInstance3D.new()
 		var caja := BoxMesh.new()
-		caja.size = Vector3(0.85, 0.6, 0.1)
+		caja.size = Vector3(0.5, 0.42, 0.08)
 		placa.mesh = caja
-		placa.position = Vector3(0, 1.0, -0.42)
+		placa.position = Vector3(0, 1.2, -0.22)
 		var mat_p := StandardMaterial3D.new()
 		mat_p.albedo_color = Color("#cbd5e1")
 		mat_p.metallic = 0.8

@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://dkg3pc5sfq4a2"]
 
 [ext_resource type="Script" uid="uid://c6vqddrh24osb" path="res://scripts/zombie.gd" id="1_85317"]
-[ext_resource type="PackedScene" uid="uid://fcjb23b1ra3m" path="res://assets/robot/robot_run.glb" id="2_vlph1"]
 
 [sub_resource type="CapsuleShape3D" id="CylinderShape3D_kewk0"]
 radius = 0.5
@@ -32,8 +31,6 @@ shape = SubResource("CylinderShape3D_kewk0")
 
 [node name="zombie_run" type="Node3D" parent="." unique_id=35107029]
 
-[node name="robot_run" parent="zombie_run" unique_id=32261184 instance=ExtResource("2_vlph1")]
-transform = Transform3D(-2, 0, -1.7484555e-07, 0, 2, 0, 1.7484555e-07, 0, -2, 0, 0, 0)
 
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=442363551]
 

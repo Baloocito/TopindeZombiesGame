@@ -36,6 +36,7 @@ func generar_plano(tier_maximo: int, es_elite: bool) -> bool:
 func configurar_color_por_tier():
 	var color: Color = COLORES_TIER.get(tier_del_plano, Color.WHITE)
 	if has_node("OmniLight3D"): $OmniLight3D.light_color = color
+	_poner_modelo(color)
 	if has_node("MeshInstance3D"):
 		# El material del prefab está en la ranura de superficie 0 (antes se
 		# buscaba en material_override, que está vacío, y el color nunca cambiaba).
@@ -46,6 +47,20 @@ func configurar_color_por_tier():
 			mat.albedo_color = color
 			mat.emission = color * 3.0
 			malla.set_surface_override_material(0, mat)
+
+# El plano muestra el arma que trae (escopeta para munición pesada, pistola
+# para el resto), teñida con el color de su tier.
+func _poner_modelo(color: Color):
+	var vieja := get_node_or_null("Modelo")
+	if vieja: vieja.free()
+	var tipo := str(Balance.arma(arma_id_contenida).get("municion", "Ligera"))
+	var nombre := "Shotgun" if tipo == "Pesada" else "Pistol_variant_one"
+	var modelo := ModelosPSX.objeto(nombre, 1.3 if nombre == "Shotgun" else 0.75)
+	if has_node("MeshInstance3D"):
+		$MeshInstance3D.visible = false
+		modelo.position.y = $MeshInstance3D.position.y - 0.2
+	add_child(modelo)
+	PS1.aplicar_tinte(modelo, color, 0.35)
 
 func al_recoger_servidor(_id_remitente: int) -> void:
 	var m = mundo()
