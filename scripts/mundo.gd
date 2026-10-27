@@ -394,6 +394,7 @@ func _ready():
 	dinero_global = int(Balance.progresion["dinero_inicial"])
 	for id in Balance.ids_armas(): nivel_armas[id] = 1
 
+	_crear_bordes_arena()
 	menus = MenusMundo.new()
 	menus.name = "Menus"
 	menus.m = self
@@ -1439,3 +1440,51 @@ func sincronizar_equipo(planos: Array, construcciones: Dictionary, niveles: Dict
 	for k in niveles.keys(): nivel_armas[k] = int(niveles[k])
 	for e in get_children():
 		if e is EstructuraBase: celdas_ocupadas[_llave_celda(e.global_position)] = true
+
+# ----------------------------------------------------------
+# BORDES DE LA ARENA
+# ----------------------------------------------------------
+# El suelo mide 50 x 50 m y afuera solo hay vacío: una muralla invisible de
+# 6 m frena a jugadores y zombies, y una baranda baja de madera marca el
+# borde para que se vea dónde termina.
+const MEDIO_ARENA := 25.0
+func _crear_bordes_arena():
+	var cuerpo := StaticBody3D.new()
+	cuerpo.name = "BordesArena"
+	add_child(cuerpo)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = load("res://assets/ps1/madera.png")
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.uv1_scale = Vector3(25, 1, 1)
+	mat.albedo_color = Color(0.75, 0.7, 0.65)
+	for lado in 4:
+		var horizontal := lado < 2
+		var signo := 1.0 if lado % 2 == 0 else -1.0
+		var centro := Vector3(0, 0, signo * (MEDIO_ARENA + 0.5)) if horizontal else Vector3(signo * (MEDIO_ARENA + 0.5), 0, 0)
+		var forma := CollisionShape3D.new()
+		var caja := BoxShape3D.new()
+		caja.size = Vector3(MEDIO_ARENA * 2 + 2, 6, 1) if horizontal else Vector3(1, 6, MEDIO_ARENA * 2 + 2)
+		forma.shape = caja
+		forma.position = centro + Vector3(0, 3, 0)
+		cuerpo.add_child(forma)
+		# Baranda: dos tablones sobre el borde mismo del suelo.
+		for alto in [0.35, 0.75]:
+			var tablon := MeshInstance3D.new()
+			var malla := BoxMesh.new()
+			malla.size = Vector3(MEDIO_ARENA * 2, 0.14, 0.08) if horizontal else Vector3(0.08, 0.14, MEDIO_ARENA * 2)
+			tablon.mesh = malla
+			tablon.material_override = mat
+			tablon.position = centro * (MEDIO_ARENA - 0.1) / (MEDIO_ARENA + 0.5) + Vector3(0, alto, 0)
+			cuerpo.add_child(tablon)
+		# Postes cada 2,5 m.
+		var i := -MEDIO_ARENA
+		while i <= MEDIO_ARENA:
+			var poste := MeshInstance3D.new()
+			var pm := BoxMesh.new()
+			pm.size = Vector3(0.14, 0.95, 0.14)
+			poste.mesh = pm
+			poste.material_override = mat
+			var borde := centro * (MEDIO_ARENA - 0.1) / (MEDIO_ARENA + 0.5)
+			poste.position = borde + (Vector3(i, 0.47, 0) if horizontal else Vector3(0, 0.47, i))
+			cuerpo.add_child(poste)
+			i += 2.5

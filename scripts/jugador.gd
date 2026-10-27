@@ -184,6 +184,10 @@ func set_can_fire(valor: bool) -> void:
 # 4. LOOP DE FÍSICAS Y CONTROLES (¡SOLO PARA EL DUEÑO!)
 # ==========================================================
 func _physics_process(delta: float) -> void:
+	# Red de seguridad: si algo lo saca de la arena y cae, vuelve al centro.
+	if is_multiplayer_authority() and global_position.y < -6.0:
+		global_position = Vector3(0, 1.0, 0)
+		velocity = Vector3.ZERO
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 
@@ -415,13 +419,20 @@ func arma_visual_en_red(modelo: String):
 	_arma_visual = null
 	_modelo_arma = modelo
 	if modelo == "": return
-	var largo := (1.0 if modelo == "Shotgun" else 0.42) if _mano_der else (1.1 if modelo == "Shotgun" else 0.55)
+	# Largo real en metros (personajes de 1,8 m).
+	var largo := (0.85 if modelo == "Shotgun" else 0.3) if _mano_der else (1.0 if modelo == "Shotgun" else 0.45)
 	var arma := ModelosPSX.objeto(modelo, largo)
 	arma.name = "ArmaVisual"
 	if _mano_der:
 		# En la mano del personaje. La pistola va fija; la escopeta se orienta
 		# cada cuadro hacia la otra mano (ver _apuntar_arma_larga).
 		_mano_der.add_child(arma)
+		# La mano hereda la escala del modelo (cada personaje viene a otra
+		# escala desde Tripo/Mixamo): se compensa para que el arma mida lo
+		# mismo en todos.
+		if _mano_der.is_inside_tree():
+			var escala_mano := maxf(0.001, _mano_der.global_basis.get_scale().x / global_basis.get_scale().x)
+			arma.scale = Vector3.ONE / escala_mano
 		if modelo != "Shotgun": arma.rotation_degrees = Vector3(90, 0, 0)
 	else:
 		# Sin modelo animado: frente al pecho, a la derecha.

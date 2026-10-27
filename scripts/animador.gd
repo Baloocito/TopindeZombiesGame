@@ -53,8 +53,8 @@ static func para(raiz: Node3D, conjunto: String) -> Animador:
 static func _libreria(conjunto: String, esq: Skeleton3D) -> AnimationLibrary:
 	var cadera := esq.find_bone(CADERA)
 	var reposo: Vector3 = esq.get_bone_rest(cadera).origin if cadera >= 0 else Vector3.UP
-	var eje := _eje_vertical(reposo)
-	var clave := "%s|%d|%d|%s" % [conjunto, esq.get_bone_count(), int(round(absf(reposo.dot(eje)) * 20.0)), eje]
+	var piernas := _largo_piernas(esq)
+	var clave := "%s|%d|%d|%d" % [conjunto, esq.get_bone_count(), int(round(reposo.y * 40.0)), int(round(piernas * 40.0))]
 	if _cache.has(clave): return _cache[clave]
 	var huesos := {}
 	for i in esq.get_bone_count(): huesos[esq.get_bone_name(i)] = true
@@ -63,7 +63,8 @@ static func _libreria(conjunto: String, esq: Skeleton3D) -> AnimationLibrary:
 		var fuente := _fuente(CONJUNTOS[conjunto][nombre])
 		if not fuente: continue
 		var anim := fuente.duplicate(true) as Animation
-		if fuente.has_meta("cadera_reposo"): anim.set_meta("cadera_reposo", fuente.get_meta("cadera_reposo"))
+		for m in ["cadera_reposo", "piernas_reposo"]:
+			if fuente.has_meta(m): anim.set_meta(m, fuente.get_meta(m))
 		var t := anim.get_track_count() - 1
 		while t >= 0:
 			var ruta := anim.track_get_path(t)
@@ -71,12 +72,26 @@ static func _libreria(conjunto: String, esq: Skeleton3D) -> AnimationLibrary:
 			if hueso != "" and not huesos.has(hueso):
 				anim.remove_track(t)
 			elif hueso == CADERA and anim.track_get_type(t) == Animation.TYPE_POSITION_3D:
-				_fijar_cadera(anim, t, reposo, eje)
+				_fijar_cadera(anim, t, reposo, piernas)
 			t -= 1
 		anim.loop_mode = Animation.LOOP_LINEAR if nombre in EN_BUCLE else Animation.LOOP_NONE
 		lib.add_animation(nombre, anim)
 	_cache[clave] = lib
 	return lib
+
+# Altura de la cadera sobre los dedos del pie en la pose de reposo, en el
+# espacio del esqueleto. Es la medida real de las piernas aunque la cadera
+# de reposo no esté donde debería (los esqueletos que llegan de Tripo ->
+# Mixamo la traen a la altura del suelo y corrida hacia adelante).
+static func _largo_piernas(esq: Skeleton3D) -> float:
+	var cadera := esq.find_bone(CADERA)
+	if cadera < 0: return 1.0
+	var pie := -1
+	for n in ["mixamorig_LeftToeBase", "mixamorig_LeftFoot", "mixamorig_RightToeBase", "mixamorig_RightFoot"]:
+		pie = esq.find_bone(n)
+		if pie >= 0: break
+	if pie < 0: return maxf(0.01, esq.get_bone_rest(cadera).origin.y)
+	return maxf(0.01, esq.get_bone_global_rest(cadera).origin.y - esq.get_bone_global_rest(pie).origin.y)
 
 static func _fuente(archivo: String) -> Animation:
 	if _fuentes.has(archivo): return _fuentes[archivo]
@@ -97,28 +112,19 @@ static func _fuente(archivo: String) -> Animation:
 	_fuentes[archivo] = anim
 	return anim
 
-# Eje "arriba" del espacio donde vive la cadera: casi siempre +Y, pero los
-# modelos que llegan de Tripo -> Mixamo traen el esqueleto con Z hacia arriba.
-static func _eje_vertical(reposo: Vector3) -> Vector3:
-	var a := reposo.abs()
-	if a.y >= a.x and a.y >= a.z: return Vector3.UP * signf(reposo.y if reposo.y != 0.0 else 1.0)
-	if a.z >= a.x: return Vector3.BACK * signf(reposo.z)
-	return Vector3.RIGHT * signf(reposo.x)
-
-# La cadera queda en el lugar (sin avanzar) y a la altura del modelo: la
-# altura de la animación (eje Y del esqueleto de Mixamo) se escala a la del
-# modelo y se pone sobre su eje vertical.
-static func _fijar_cadera(anim: Animation, t: int, reposo: Vector3, eje: Vector3):
+# La cadera queda en el lugar (sin avanzar) y a la altura del modelo: se
+# parte de la cadera de reposo del modelo y se le suma cuánto sube o baja la
+# cadera en la animación, escalado por el largo de las piernas. En X/Z queda
+# en el centro, así el personaje gira sobre su propio eje.
+static func _fijar_cadera(anim: Animation, t: int, reposo: Vector3, piernas: float):
 	var n := anim.track_get_key_count(t)
 	if n == 0: return
 	var inicio: Vector3 = anim.track_get_key_value(t, 0)
 	var referencia := float(anim.get_meta("cadera_reposo", inicio.y))
-	var alto := reposo.dot(eje)
-	var plano := reposo - eje * alto
-	var proporcion := alto / maxf(0.01, referencia)
+	var proporcion := piernas / maxf(0.01, float(anim.get_meta("piernas_reposo", referencia)))
 	for k in n:
 		var v: Vector3 = anim.track_get_key_value(t, k)
-		anim.track_set_key_value(t, k, plano + eje * (v.y * proporcion))
+		anim.track_set_key_value(t, k, Vector3(0.0, reposo.y + (v.y - referencia) * proporcion, 0.0))
 
 # Cambia de animación solo si hace falta (no reinicia la que ya está sonando).
 func poner(nombre: String, velocidad: float = 1.0):
