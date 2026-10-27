@@ -33,6 +33,11 @@ func _agregar_opcion_ps1():
 	controles.pressed.connect(func(): _menu_controles = MenuControles.abrir(self))
 	EstiloUI.agregar_rebote(controles)
 	panel_opciones.add_child(controles)
+	var zoom := EstiloUI.selector_zoom()
+	zoom.position = Vector2(196, 262)
+	panel_opciones.add_child(zoom)
+	var cerrar := panel_opciones.get_node_or_null("Button") as Control
+	if cerrar: cerrar.position.y = 345
 
 var _menu_controles: MenuControles
 

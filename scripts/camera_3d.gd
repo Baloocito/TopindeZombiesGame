@@ -1,29 +1,44 @@
 extends Camera3D
+# ==========================================================
+# CÁMARA 3/4 FIJA QUE SIGUE AL JUGADOR (Manual v3: sin rotación)
+# ==========================================================
+# Mira con un ángulo fijo hacia el norte y mantiene al jugador centrado, con
+# una pequeña zona muerta para que no tiemble con cada paso. La distancia
+# tiene tres niveles (Opciones > Cámara): en el celular arranca más cerca.
+
+const INCLINACION := 50.0   # grados hacia abajo
+const CAMPO_VISION := 50.0
+const DISTANCIAS := {"lejos": 18.0, "normal": 14.0, "cerca": 10.5}
 
 @export var objetivo: Node3D
 @export var velocidad_suavizado: float = 5.0
+@export var zona_muerta := Vector2(1.2, 0.9)   # metros en X y en Z
 
-# 📦 Márgenes asimétricos para la "Caja Invisible"
+# Las dejamos para no romper la escena (ya no se usan).
 @export var margen_izquierdo: float = 3.0
 @export var margen_derecho: float = 3.0
-@export var margen_arriba: float = 3.0  # Movimiento hacia el "norte" (-Z)
-@export var margen_abajo: float = 1.0   # Movimiento hacia el "sur" (+Z). ¡MÁS PEQUEÑO!
+@export var margen_arriba: float = 3.0
+@export var margen_abajo: float = 1.0
 
-var offset: Vector3
 var punto_enfoque: Vector3
 var inicializado: bool = false
+var distancia_actual := 14.0
+
+func _ready():
+	fov = CAMPO_VISION
+	rotation_degrees = Vector3(-INCLINACION, 0, 0)
+	distancia_actual = distancia_objetivo()
+
+static func distancia_objetivo() -> float:
+	return DISTANCIAS.get(PS1.zoom_camara, 14.0)
+
+func _direccion_atras() -> Vector3:
+	return global_basis.z.normalized()  # opuesto a hacia dónde mira
 
 func _physics_process(delta):
-	# --- FIX (revisión de código) ---
-	# Si el peer de red se cerró (el otro jugador se desconectó, o el juego
-	# está terminando), multiplayer.get_unique_id() tira un error de motor
-	# ("The multiplayer instance isn't currently active") en cada frame.
-	# Con este chequeo, simplemente dejamos de intentar buscar al jugador
-	# en vez de spamear el log.
 	if not multiplayer.has_multiplayer_peer():
 		return
 
-	# 1. Si la cámara no tiene un objetivo asignado, lo buscamos dinámicamente
 	if not objetivo:
 		# --- FIX (revisión de código, Fase 1.C: Reconexión) ---
 		# Antes usaba multiplayer.get_unique_id() directo. Eso deja de servir
@@ -37,31 +52,20 @@ func _physics_process(delta):
 		# Si la carpeta existe y tu clon ya fue generado...
 		if contenedor and EstadoPartida.mi_id_logico != -1 and contenedor.has_node(mi_id):
 			objetivo = contenedor.get_node(mi_id) # ¡Enganchamos el objetivo!
-
-			# Calculamos las matemáticas iniciales (solo se hace una vez)
-			offset = global_position - objetivo.global_position
 			punto_enfoque = objetivo.global_position
 			inicializado = true
-			current = true # Encendemos esta cámara
+			current = true
+			global_position = punto_enfoque + Vector3(0, 0.9, 0) + _direccion_atras() * distancia_actual
+		return
 
-		return # Pausamos la cámara hasta que encuentre al jugador
-
-	# 2. Si ya encontramos al jugador, ejecutamos tu excelente lógica de seguimiento
 	if inicializado:
-		var pos_jugador = objetivo.global_position
-
-		# Eje X (Izquierda / Derecha)
-		if pos_jugador.x < punto_enfoque.x - margen_izquierdo:
-			punto_enfoque.x = pos_jugador.x + margen_izquierdo
-		elif pos_jugador.x > punto_enfoque.x + margen_derecho:
-			punto_enfoque.x = pos_jugador.x - margen_derecho
-
-		# Eje Z (Arriba / Abajo)
-		if pos_jugador.z < punto_enfoque.z - margen_arriba:
-			punto_enfoque.z = pos_jugador.z + margen_arriba
-		elif pos_jugador.z > punto_enfoque.z + margen_abajo:
-			punto_enfoque.z = pos_jugador.z - margen_abajo
-
-		# Interpolar la cámara hacia el nuevo punto de enfoque
-		var posicion_final = punto_enfoque + offset
-		global_position = global_position.lerp(posicion_final, velocidad_suavizado * delta)
+		var p := objetivo.global_position
+		if p.x < punto_enfoque.x - zona_muerta.x: punto_enfoque.x = p.x + zona_muerta.x
+		elif p.x > punto_enfoque.x + zona_muerta.x: punto_enfoque.x = p.x - zona_muerta.x
+		if p.z < punto_enfoque.z - zona_muerta.y: punto_enfoque.z = p.z + zona_muerta.y
+		elif p.z > punto_enfoque.z + zona_muerta.y: punto_enfoque.z = p.z - zona_muerta.y
+		punto_enfoque.y = p.y
+		# El zoom cambia suave si se modifica en Opciones.
+		distancia_actual = lerpf(distancia_actual, distancia_objetivo(), minf(1.0, delta * 4.0))
+		var meta := punto_enfoque + Vector3(0, 0.9, 0) + _direccion_atras() * distancia_actual
+		global_position = global_position.lerp(meta, minf(1.0, velocidad_suavizado * delta))

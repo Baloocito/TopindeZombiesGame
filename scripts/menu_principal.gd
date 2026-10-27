@@ -60,6 +60,7 @@ func _abrir_opciones():
 	ps1.button_pressed = PS1.activo
 	ps1.toggled.connect(func(v): PS1.alternar(v))
 	col.add_child(ps1)
+	col.add_child(EstiloUI.selector_zoom())
 	var controles := Button.new()
 	controles.text = "Controles"
 	controles.custom_minimum_size = Vector2(280, 54)

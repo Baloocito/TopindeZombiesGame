@@ -73,6 +73,31 @@ static func agregar_rebote(boton: BaseButton) -> void:
 # un nodo "Efectos" para que el MultiplayerSpawner de Mundo no lo vea.
 const FUENTE := preload("res://assets/fuentes/RussoOne.woff2")
 
+# Selector "Cámara: Lejos / Normal / Cerca" (Opciones del menú y de la pausa).
+static func selector_zoom() -> HBoxContainer:
+	var fila := HBoxContainer.new()
+	fila.alignment = BoxContainer.ALIGNMENT_CENTER
+	fila.add_theme_constant_override("separation", 8)
+	var l := Label.new()
+	l.text = "Cámara"
+	fila.add_child(l)
+	var botones := []
+	for z in [["lejos", "Lejos"], ["normal", "Normal"], ["cerca", "Cerca"]]:
+		var b := Button.new()
+		b.text = z[1]
+		b.custom_minimum_size = Vector2(92, 44)
+		b.set_meta("zoom", z[0])
+		fila.add_child(b)
+		botones.append(b)
+	var pintar := func():
+		for b in botones: b.theme_type_variation = "OpcionPrimaria" if b.get_meta("zoom") == PS1.zoom_camara else "OpcionVidrio"
+	for b in botones:
+		b.pressed.connect(func():
+			PS1.cambiar_zoom(b.get_meta("zoom"))
+			pintar.call())
+	pintar.call()
+	return fila
+
 static func texto_flotante(posicion: Vector3, texto: String, color: Color) -> void:
 	var arbol := Engine.get_main_loop() as SceneTree
 	var mundo := arbol.current_scene if arbol else null

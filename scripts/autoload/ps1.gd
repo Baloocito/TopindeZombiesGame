@@ -20,6 +20,9 @@ const LINEAS := 270.0             # alto de la imagen virtual
 const ESCALA_3D := 0.6            # el 3D se dibuja a menor resolución (rinde más en teléfonos)
 
 var activo := true
+# Distancia de la cámara: "lejos", "normal" o "cerca" (ver camera_3d.gd).
+var zoom_camara := "normal"
+var _noche := false
 var _cache: Dictionary = {}       # material original -> ShaderMaterial PS1
 var _filtro: CanvasLayer
 var _env: Environment
@@ -29,8 +32,10 @@ var _sombra_mat: StandardMaterial3D
 
 func _ready():
 	var cfg := ConfigFile.new()
+	zoom_camara = "cerca" if DisplayServer.is_touchscreen_available() else "normal"
 	if cfg.load(RUTA_AJUSTES) == OK:
 		activo = bool(cfg.get_value("video", "ps1", true))
+		zoom_camara = str(cfg.get_value("video", "zoom", zoom_camara))
 	_actualizar_resolucion()
 	get_tree().root.size_changed.connect(_actualizar_resolucion)
 	get_tree().node_added.connect(_al_agregar_nodo)
@@ -50,6 +55,14 @@ func alternar(valor: bool):
 		else: restaurar(n)
 	if is_instance_valid(_filtro): _filtro.visible = activo
 	for s in get_tree().get_nodes_in_group("sombra_ps1"): s.visible = activo
+
+func cambiar_zoom(valor: String):
+	zoom_camara = valor
+	var cfg := ConfigFile.new()
+	cfg.load(RUTA_AJUSTES)
+	cfg.set_value("video", "zoom", valor)
+	cfg.save(RUTA_AJUSTES)
+	poner_noche(_env, _luz, _noche)
 
 func _aplicar_viewport():
 	var vp := get_tree().root
@@ -222,8 +235,8 @@ func crear_ambiente(mundo: Node3D) -> Environment:
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = Color("#3a3833")
 	env.fog_density = 1.0
-	env.fog_depth_begin = 16.0
-	env.fog_depth_end = 42.0
+	env.fog_depth_begin = 18.0
+	env.fog_depth_end = 45.0
 	env.fog_depth_curve = 1.2
 	env.fog_sky_affect = 1.0
 	amb.environment = env
@@ -236,8 +249,11 @@ func poner_noche(env: Environment, luz: DirectionalLight3D, noche: bool):
 	var fondo := Color("#0d0f16") if noche else Color("#2b2a28")
 	t.tween_property(env, "background_color", fondo, 2.0)
 	t.tween_property(env, "fog_light_color", Color("#141824") if noche else Color("#3a3833"), 2.0)
-	t.tween_property(env, "fog_depth_begin", 13.0 if noche else 18.0, 2.0)
-	t.tween_property(env, "fog_depth_end", 36.0 if noche else 46.0, 2.0)
+	# La niebla empieza un poco detrás del jugador, según qué tan lejos esté la cámara.
+	_noche = noche
+	var d := float({"lejos": 18.0, "normal": 14.0, "cerca": 10.5}.get(zoom_camara, 14.0))
+	t.tween_property(env, "fog_depth_begin", d + (0.0 if noche else 4.0), 2.0)
+	t.tween_property(env, "fog_depth_end", d + (20.0 if noche else 28.0), 2.0)
 	t.tween_property(env, "ambient_light_color", Color("#7a86a8") if noche else Color("#8a8478"), 2.0)
 	t.tween_property(env, "ambient_light_energy", 0.8 if noche else 0.55, 2.0)
 	if is_instance_valid(luz):

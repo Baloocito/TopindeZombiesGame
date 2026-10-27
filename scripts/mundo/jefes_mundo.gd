@@ -146,7 +146,7 @@ func _malla_suelo(forma: int, tam: Vector2, color: Color, alfa: float) -> Node3D
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.no_depth_test = true
+	mat.no_depth_test = false  # los personajes se ven encima del aviso
 	mat.render_priority = 5
 	var mi := MeshInstance3D.new()
 	mi.material_override = mat
