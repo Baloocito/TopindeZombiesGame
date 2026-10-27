@@ -8,6 +8,20 @@ func _ready():
 	texto_proximamente.visible = false
 	for b in $VBoxContainer.get_children():
 		if b is BaseButton: EstiloUI.agregar_rebote(b)
+	# Con mando el foco arranca en "Jugar" (sin foco, el mando no hace nada).
+	Controles.enfocar_en($VBoxContainer, true)
+
+var _opciones: CanvasLayer
+
+# B / Esc cierra Opciones.
+func _unhandled_input(event: InputEvent):
+	if event.is_action_pressed("ui_cancel") and is_instance_valid(_opciones):
+		get_viewport().set_input_as_handled()
+		_cerrar_opciones()
+
+func _cerrar_opciones():
+	if is_instance_valid(_opciones): _opciones.queue_free()
+	Controles.enfocar_en($VBoxContainer, true)
 
 # ==========================================
 # SEÑALES DE LOS BOTONES
@@ -34,6 +48,7 @@ func _abrir_opciones():
 	var capa := CanvasLayer.new()
 	capa.layer = 40
 	add_child(capa)
+	_opciones = capa
 	var fondo := ColorRect.new()
 	fondo.color = Color(0, 0, 0, 0.7)
 	fondo.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -70,7 +85,7 @@ func _abrir_opciones():
 	cerrar.text = "Cerrar"
 	cerrar.theme_type_variation = "BotonPrimario"
 	cerrar.custom_minimum_size = Vector2(280, 54)
-	cerrar.pressed.connect(capa.queue_free)
+	cerrar.pressed.connect(_cerrar_opciones)
 	col.add_child(cerrar)
 	for b in [controles, cerrar]: EstiloUI.agregar_rebote(b)
 	controles.grab_focus.call_deferred()

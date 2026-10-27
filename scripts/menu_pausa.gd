@@ -44,9 +44,9 @@ var _menu_controles: MenuControles
 # Esc / Start cierra la pausa (y primero el panel de opciones si está abierto).
 func _unhandled_input(event: InputEvent):
 	if not visible or is_instance_valid(_menu_controles): return
-	if event.is_action_pressed("pausa"):
+	if event.is_action_pressed("pausa") or event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
-		if panel_opciones and panel_opciones.visible: panel_opciones.visible = false
+		if panel_opciones and panel_opciones.visible: _on_boton_cerrar_opciones_pressed()
 		else: alternar_pausa()
 
 func alternar_pausa():
@@ -61,10 +61,12 @@ func alternar_pausa():
 	if visible:
 		if not es_online:
 			get_tree().paused = true 
+		Controles.enfocar_en($VBoxContainer, true)
 	else:
 		get_tree().paused = false 
 		if panel_opciones: 
 			panel_opciones.visible = false 
+			_foco_pausa(true)
 
 # --- SEÑALES DE LOS BOTONES ---
 
@@ -74,10 +76,20 @@ func _on_boton_reanudar_pressed():
 func _on_boton_opciones_pressed():
 	if panel_opciones:
 		panel_opciones.visible = true 
+		# Mientras están las opciones, los botones de la pausa no se pueden
+		# enfocar (si no, el mando se escapaba hacia ellos).
+		_foco_pausa(false)
+		Controles.enfocar_en(panel_opciones, true)
 
 func _on_boton_cerrar_opciones_pressed():
 	if panel_opciones:
 		panel_opciones.visible = false
+		_foco_pausa(true)
+		Controles.enfocar_en($VBoxContainer, true)
+
+func _foco_pausa(activo: bool):
+	for b in $VBoxContainer.get_children():
+		if b is Control: (b as Control).focus_mode = Control.FOCUS_ALL if activo else Control.FOCUS_NONE
 
 func _on_boton_abandonar_pressed():
 	get_tree().paused = false

@@ -35,7 +35,8 @@ var sala_bloqueada: bool = false  # true apenas arranca la partida
 # Controles nuevos -- se crean solos en _crear_controles_nuevos(), no hace
 # falta tocar la escena Lobby.tscn en el editor.
 var fila_cantidad: HBoxContainer
-var spin_cantidad: SpinBox
+var etiqueta_cantidad: Label
+var selector: SelectorPersonaje
 var input_contrasena_crear: LineEdit
 var input_contrasena_unirse: LineEdit
 var label_estado_sala: Label
@@ -53,25 +54,42 @@ func _ready():
 
 	_crear_controles_nuevos()
 	_aplicar_estilo()
+	# Con mando, el foco arranca en "Jugar solo / Crear partida".
+	if Controles.usando_mando: btn_host.grab_focus.call_deferred()
 
 func _crear_controles_nuevos():
 	var vbox = $VBoxContainer
 
+	# --- Selector de personaje (se puede cambiar también ya dentro de la sala) ---
+	# (va a la izquierda de la tarjeta, ver _aplicar_estilo)
+	selector = SelectorPersonaje.new()
+	selector.cambiado.connect(_al_cambiar_personaje)
+
 	# --- Cuántos jugadores quiere el host en total (incluyéndose) ---
+	# Botones − / + en vez de un SpinBox: el SpinBox atrapaba la cruceta del
+	# mando (arriba/abajo cambiaban el número en vez de moverse por el menú).
 	fila_cantidad = HBoxContainer.new()
+	fila_cantidad.alignment = BoxContainer.ALIGNMENT_CENTER
 	var label_cantidad = Label.new()
 	label_cantidad.text = "Jugadores en la sala: "
-	spin_cantidad = SpinBox.new()
-	spin_cantidad.min_value = 1
-	spin_cantidad.max_value = MAX_CLIENTS
-	spin_cantidad.value = cantidad_deseada
-	spin_cantidad.value_changed.connect(func(v):
-		cantidad_deseada = int(v)
-		_actualizar_texto_boton_host())
+	var menos := Button.new()
+	menos.text = "−"
+	menos.custom_minimum_size = Vector2(52, 44)
+	menos.pressed.connect(func(): _poner_cantidad(cantidad_deseada - 1))
+	etiqueta_cantidad = Label.new()
+	etiqueta_cantidad.custom_minimum_size = Vector2(40, 0)
+	etiqueta_cantidad.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var mas := Button.new()
+	mas.text = "+"
+	mas.custom_minimum_size = Vector2(52, 44)
+	mas.pressed.connect(func(): _poner_cantidad(cantidad_deseada + 1))
 	fila_cantidad.add_child(label_cantidad)
-	fila_cantidad.add_child(spin_cantidad)
+	fila_cantidad.add_child(menos)
+	fila_cantidad.add_child(etiqueta_cantidad)
+	fila_cantidad.add_child(mas)
 	vbox.add_child(fila_cantidad)
 	vbox.move_child(fila_cantidad, btn_host.get_index())
+	_poner_cantidad(cantidad_deseada)
 
 	# --- Contraseña opcional al crear sala ---
 	input_contrasena_crear = LineEdit.new()
@@ -114,12 +132,37 @@ func _crear_controles_nuevos():
 
 	_actualizar_texto_boton_host()
 
+func _poner_cantidad(n: int):
+	cantidad_deseada = clampi(n, 1, MAX_CLIENTS)
+	if etiqueta_cantidad: etiqueta_cantidad.text = str(cantidad_deseada)
+	_actualizar_texto_boton_host()
+
+func _al_cambiar_personaje(id: String):
+	EstadoPartida.elegir_personaje_local(id)
+	if multiplayer.multiplayer_peer == null or not jugadores_conectados.has(multiplayer.get_unique_id()): return
+	if soy_host:
+		EstadoPartida.asignar_personaje(1, id)
+		_repartir_lista()
+	else:
+		cambiar_personaje.rpc_id(1, id)
+
+# Un invitado ya en la sala cambia de personaje.
+@rpc("any_peer", "reliable")
+func cambiar_personaje(id: String):
+	if not multiplayer.is_server() or sala_bloqueada: return
+	var quien := multiplayer.get_remote_sender_id()
+	if not jugadores_conectados.has(quien): return
+	EstadoPartida.asignar_personaje(quien, id)
+	_repartir_lista()
+
+func _repartir_lista():
+	sincronizar_lista_jugadores.rpc(jugadores_conectados, EstadoPartida.personajes)
+
 func _on_btn_continuar_pressed():
 	var guardada := GuardadoGlobal.cargar_partida()
 	if guardada.is_empty(): return
 	EstadoPartida.partida_a_cargar = guardada
-	cantidad_deseada = clampi(guardada.get("jugadores", {}).size(), 1, MAX_CLIENTS)
-	spin_cantidad.value = cantidad_deseada
+	_poner_cantidad(guardada.get("jugadores", {}).size())
 	_continuando = true
 	_on_btn_host_pressed()
 	_continuando = false
@@ -139,7 +182,23 @@ func _aplicar_estilo():
 	add_child(centro)
 	var tarjeta := PanelContainer.new()
 	centro.add_child(tarjeta)
-	vbox.reparent(tarjeta, false)
+	var columnas := HBoxContainer.new()
+	columnas.add_theme_constant_override("separation", 28)
+	tarjeta.add_child(columnas)
+	var izq := VBoxContainer.new()
+	izq.alignment = BoxContainer.ALIGNMENT_CENTER
+	columnas.add_child(izq)
+	var elige := Label.new()
+	elige.text = "TU PERSONAJE"
+	elige.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	elige.modulate = Color(1, 0.85, 0.4)
+	izq.add_child(elige)
+	izq.add_child(selector)
+	vbox.reparent(columnas, false)
+	# Foco con mando entre las dos columnas.
+	selector.conectar_foco(fila_cantidad.get_child(1), btn_host)
+	for c in [fila_cantidad.get_child(1), btn_host, boton_continuar, btn_unirse]:
+		c.focus_neighbor_left = c.get_path_to(selector.flecha())
 	vbox.custom_minimum_size = Vector2(460, 0)
 	vbox.add_theme_constant_override("separation", 12)
 
@@ -153,6 +212,7 @@ func _aplicar_estilo():
 	boton_iniciar.theme_type_variation = &"BotonPrimario"
 	boton_continuar.theme_type_variation = &"BotonPrimario"
 	lista_jugadores.custom_minimum_size = Vector2(0, 120)
+	lista_jugadores.focus_mode = Control.FOCUS_NONE
 	input_ip.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	for b in [btn_host, btn_unirse, boton_iniciar, boton_continuar, boton_volver]:
 		EstiloUI.agregar_rebote(b)
@@ -167,6 +227,7 @@ func _volver_al_menu():
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = null
 	EstadoPartida.ids_iniciales = []
+	EstadoPartida.personajes = {}
 	get_tree().change_scene_to_file("res://scenes/menu_principal.tscn")
 
 func _unhandled_input(event):
@@ -198,6 +259,8 @@ func _on_btn_host_pressed():
 
 	# EL HOST SE REGISTRA A SÍ MISMO (El Host SIEMPRE es el ID 1)
 	jugadores_conectados[1] = "Superviviente 1 (Host)"
+	EstadoPartida.personajes = {}
+	EstadoPartida.asignar_personaje(1, selector.id_actual())
 	actualizar_ui_lobby()
 	_actualizar_estado_sala()
 
@@ -261,13 +324,14 @@ func _on_peer_disconnected(id):
 	print("Jugador desconectado: ", id)
 	if soy_host:
 		jugadores_conectados.erase(id)
-		sincronizar_lista_jugadores.rpc(jugadores_conectados)
+		EstadoPartida.personajes.erase(id)
+		_repartir_lista()
 
 func _on_conectado_al_servidor():
 	print("Conectado a nivel de red -- pidiendo entrar a la sala...")
 	var mi_id = multiplayer.get_unique_id()
 	var mi_contrasena = input_contrasena_unirse.text
-	solicitar_entrar_a_sala.rpc_id(1, mi_id, "Superviviente " + str(mi_id), mi_contrasena)
+	solicitar_entrar_a_sala.rpc_id(1, mi_id, "Superviviente " + str(mi_id), mi_contrasena, selector.id_actual())
 
 func _on_falla_de_conexion():
 	print("Error de conexión. ¿El Host está activo?")
@@ -289,7 +353,7 @@ func _mostrar_error(texto: String):
 # El cliente le pide entrar al host, mandando la contraseña que escribió (si
 # la sala no tiene, cualquier valor -- incluso vacío -- sirve).
 @rpc("any_peer", "reliable")
-func solicitar_entrar_a_sala(id_solicitante: int, nombre: String, contrasena_ingresada: String):
+func solicitar_entrar_a_sala(id_solicitante: int, nombre: String, contrasena_ingresada: String, personaje: String):
 	if not multiplayer.is_server(): return
 
 	if sala_bloqueada:
@@ -305,8 +369,9 @@ func solicitar_entrar_a_sala(id_solicitante: int, nombre: String, contrasena_ing
 		return
 
 	jugadores_conectados[id_solicitante] = nombre
+	EstadoPartida.asignar_personaje(id_solicitante, personaje)
 	informar_cantidad_deseada.rpc_id(id_solicitante, cantidad_deseada)
-	sincronizar_lista_jugadores.rpc(jugadores_conectados)
+	_repartir_lista()
 
 func _rechazar_conexion(id_solicitante: int, motivo: String) -> void:
 	print("Jugador ", id_solicitante, " rechazado: ", motivo)
@@ -335,8 +400,12 @@ func informar_cantidad_deseada(cantidad: int):
 # Evitamos así el patrón anterior de "cada cliente se presenta a mano",
 # que dejaba a los clientes viejos sin saber de los nuevos.
 @rpc("authority", "call_local", "reliable")
-func sincronizar_lista_jugadores(lista: Dictionary):
+func sincronizar_lista_jugadores(lista: Dictionary, personajes: Dictionary):
 	jugadores_conectados = lista
+	EstadoPartida.personajes = personajes
+	# Si el anfitrión me dio otro (el mío ya estaba tomado), lo muestro.
+	var mio = personajes.get(multiplayer.get_unique_id(), "")
+	if mio != "" and selector: selector.mostrar(mio)
 	actualizar_ui_lobby()
 	_actualizar_estado_sala()
 
@@ -344,7 +413,10 @@ func sincronizar_lista_jugadores(lista: Dictionary):
 func actualizar_ui_lobby():
 	lista_jugadores.clear()
 	for id in jugadores_conectados:
-		lista_jugadores.add_item(jugadores_conectados[id])
+		var texto: String = jugadores_conectados[id]
+		var pid = EstadoPartida.personajes.get(id, "")
+		if pid != "": texto += "  —  " + str(EstadoPartida.protagonista(pid).get("nombre", pid))
+		lista_jugadores.add_item(texto)
 
 func _actualizar_estado_sala():
 	label_estado_sala.show()
@@ -352,7 +424,10 @@ func _actualizar_estado_sala():
 	label_estado_sala.text = "Sala: %d/%d jugadores" % [jugadores_conectados.size(), cantidad_deseada]
 
 	if soy_host:
+		var antes: bool = boton_iniciar.visible
 		boton_iniciar.visible = jugadores_conectados.size() >= cantidad_deseada
+		if boton_iniciar.visible and not antes and Controles.usando_mando:
+			boton_iniciar.grab_focus.call_deferred()
 
 # ==========================================
 # TRANSICIÓN AL MAPA DE JUEGO

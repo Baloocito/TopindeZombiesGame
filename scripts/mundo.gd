@@ -411,6 +411,12 @@ func _ready():
 	campana.m = self
 	add_child(campana)
 	$InterfazUI.add_child(MedidorRendimiento.new())
+	# El HUD no se enfoca solo con el mando (ver Controles._excluido): se entra
+	# con "Usar los menús del día" (Select / Tab).
+	for ruta in ["HudSuperiorIzquierdo", "HudSuperiorDerecho", "HudLateralDerecho", "HudInferiorCentro", "EsquinaArmas", "BotonRecargaIzquierdo"]:
+		var n = $InterfazUI.get_node_or_null(ruta)
+		if n: n.add_to_group("sin_foco_auto")
+	_hud_enfocable(false)
 
 	holograma.visible = false
 	panel_fase.visible = false
@@ -980,6 +986,7 @@ func liberar_celda(pos: Vector3):
 	actualizar_boton_reparacion()
 
 func _unhandled_input(event):
+	if _entrada_de_mando(event): return
 	if event.is_action_pressed("pausa") and menu_pausa and not menu_pausa.visible:
 		get_viewport().set_input_as_handled()
 		menu_pausa.alternar_pausa()
@@ -990,6 +997,12 @@ func _unhandled_input(event):
 		_al_presionar_iniciar()
 		return
 	if not modo_construccion or fase_combate: return
+
+	# Con mando la casilla sigue al jugador (ver _construccion_con_mando) y RT construye.
+	if Controles.usando_mando and event.is_action_pressed("disparar") and holograma.visible:
+		get_viewport().set_input_as_handled()
+		construir_estructura()
+		return
 
 	if event is InputEventScreenTouch and event.pressed:
 		var camara = get_viewport().get_camera_3d()
@@ -1013,6 +1026,67 @@ func _unhandled_input(event):
 					var costo_actual = obtener_precio_estructura(objeto_seleccionado_tienda)
 					holograma.material_override.albedo_color = Color(0, 1, 0, 0.6) if dinero_global >= costo_actual else Color(1, 0, 0, 0.6)
 
+# ----------------------------------------------------------
+# MANDO: menús del día, cerrar con B y construir sin pantalla táctil
+# ----------------------------------------------------------
+func _entrada_de_mando(event: InputEvent) -> bool:
+	if event.is_action_pressed("menu_interfaz"):
+		get_viewport().set_input_as_handled()
+		var foco := get_viewport().gui_get_focus_owner()
+		if foco and Controles._excluido(foco):
+			_hud_enfocable(false)
+		else:
+			_hud_enfocable(true)
+			if not fase_combate and boton_construir and boton_construir.is_visible_in_tree():
+				boton_construir.grab_focus()
+			elif boton_pausa:
+				boton_pausa.grab_focus()
+		return true
+	if event.is_action_pressed("ui_cancel") and not (menu_pausa and menu_pausa.visible):
+		if panel_lateral and panel_lateral.visible:
+			get_viewport().set_input_as_handled()
+			cerrar_menu_lateral()
+			return true
+		if modo_construccion:
+			get_viewport().set_input_as_handled()
+			alternar_modo_construccion()
+			return true
+		var foco := get_viewport().gui_get_focus_owner()
+		if foco and Controles._excluido(foco):
+			get_viewport().set_input_as_handled()
+			_hud_enfocable(false)
+			return true
+	return false
+
+# Los botones del HUD solo aceptan foco mientras se usan con el mando (si no,
+# tras tocarlos con el ratón, Enter o Espacio los volvía a apretar).
+func _hud_enfocable(activo: bool):
+	var foco := get_viewport().gui_get_focus_owner()
+	if not activo and foco and Controles._excluido(foco): foco.release_focus()
+	for g in get_tree().get_nodes_in_group("sin_foco_auto"):
+		for b in g.find_children("*", "BaseButton", true, false) + ([g] if g is BaseButton else []):
+			(b as Control).focus_mode = Control.FOCUS_ALL if activo else Control.FOCUS_NONE
+
+var _aviso_mando_construccion := false
+func _construccion_con_mando():
+	if not modo_construccion or fase_combate or not Controles.usando_mando or not holograma:
+		_aviso_mando_construccion = false
+		return
+	var j = obtener_jugador_local()
+	if not j: return
+	if not _aviso_mando_construccion:
+		_aviso_mando_construccion = true
+		mostrar_aviso("Con el mando: muévete y apunta para elegir la casilla, RT construye y B termina.")
+	var frente := Vector3(sin(j.rotation.y), 0, cos(j.rotation.y))
+	var p: Vector3 = j.global_position + frente * 2.6
+	var celda := Vector3(snapped(p.x, TAMAÑO_GRILLA), 0.0, snapped(p.z, TAMAÑO_GRILLA))
+	holograma.global_position = celda
+	holograma.visible = true
+	celda_previa_tocada = celda
+	if objeto_seleccionado_tienda != "" and not Balance.estructura(objeto_seleccionado_tienda).is_empty():
+		var costo := obtener_precio_estructura(objeto_seleccionado_tienda)
+		holograma.material_override.albedo_color = Color(0, 1, 0, 0.6) if dinero_global >= costo else Color(1, 0, 0, 0.6)
+
 # ==========================================================
 # 9. SISTEMA DE MENÚS (Independientes por jugador)
 # ==========================================================
@@ -1035,6 +1109,9 @@ func _on_boton_pausa_pressed() -> void:
 
 func cerrar_menu_lateral():
 	if panel_lateral: panel_lateral.visible = false
+	if Controles.usando_mando and boton_construir and not fase_combate:
+		_hud_enfocable(true)
+		boton_construir.grab_focus.call_deferred()
 	# Las herramientas de la derecha quedan debajo del panel: se ocultan
 	# mientras está abierto y vuelven al cerrarlo (solo de día).
 	if hud_dia_lateral: hud_dia_lateral.visible = not fase_combate
@@ -1048,6 +1125,10 @@ func abrir_menu_interactivo(menu_activo: Control, funcion_generadora: Callable):
 		if is_instance_valid(menu):
 			menu.visible = (menu == menu_activo)
 	funcion_generadora.call()
+	_hud_enfocable(false)
+	# Con mando, el foco entra al panel (cuando la lista ya está armada).
+	if Controles.usando_mando:
+		(func(): Controles.enfocar_en(menu_activo) or Controles.enfocar_en(panel_lateral)).call_deferred()
 
 func abrir_menu_inspector(torreta_tocada: Node3D):
 	torreta_seleccionada = torreta_tocada
@@ -1323,6 +1404,7 @@ func cargar_estado_jugador(datos: Dictionary):
 	_datos_propios_pendientes = datos
 
 func _process(_delta):
+	_construccion_con_mando()
 	if _datos_propios_pendientes.is_empty(): return
 	var jugador = obtener_jugador_local()
 	if jugador and jugador.is_inside_tree():

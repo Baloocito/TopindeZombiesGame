@@ -248,3 +248,67 @@ func conectar_como_cliente() -> void:
 		return
 	multiplayer.multiplayer_peer = peer
 	mostrar_overlay_texto("Volviendo a la partida…")
+
+# ==========================================================
+# PERSONAJE ELEGIDO (selector del lobby)
+# ==========================================================
+# personaje_local: el que eligió este jugador (se recuerda en ajustes.cfg).
+# personajes: id de red -> id de personaje, lo decide el anfitrión (si dos
+# eligen el mismo, el segundo recibe uno libre) y lo reparte con la lista de
+# la sala. jugador.gd lo consulta al crear su modelo.
+const RUTA_AJUSTES := "user://ajustes.cfg"
+var personaje_local: String = ""
+var personajes: Dictionary = {}
+var _protagonistas: Array = []
+
+func protagonistas() -> Array:
+	if _protagonistas.is_empty():
+		var d = JSON.parse_string(FileAccess.get_file_as_string("res://data/personajes.json"))
+		if typeof(d) == TYPE_DICTIONARY: _protagonistas = d.get("protagonistas", [])
+	return _protagonistas
+
+func protagonista(id: String) -> Dictionary:
+	for p in protagonistas():
+		if p.id == id: return p
+	return protagonistas()[0] if not protagonistas().is_empty() else {}
+
+func cargar_personaje_local() -> String:
+	if personaje_local == "":
+		var cfg := ConfigFile.new()
+		cfg.load(RUTA_AJUSTES)
+		personaje_local = str(cfg.get_value("jugador", "personaje", ""))
+		if protagonista(personaje_local).get("id", "") != personaje_local and not protagonistas().is_empty():
+			personaje_local = protagonistas()[0].id
+	return personaje_local
+
+func elegir_personaje_local(id: String):
+	personaje_local = id
+	var cfg := ConfigFile.new()
+	cfg.load(RUTA_AJUSTES)
+	cfg.set_value("jugador", "personaje", id)
+	cfg.save(RUTA_AJUSTES)
+
+# El anfitrión asigna: si ya lo tiene otro, el primero libre en orden.
+func asignar_personaje(id_red: int, deseado: String) -> String:
+	var ocupados := {}
+	for otro in personajes.keys():
+		if int(otro) != id_red: ocupados[personajes[otro]] = true
+	var elegido := deseado
+	if ocupados.has(elegido) or protagonista(elegido).get("id", "") != elegido:
+		for p in protagonistas():
+			if not ocupados.has(p.id):
+				elegido = p.id
+				break
+	personajes[id_red] = elegido
+	return elegido
+
+# Modelo 3D del jugador cuyo nodo se llama `id_red`. Sin elección registrada
+# (partida continuada, pruebas) se reparte por orden para que no se repitan.
+func modelo_de_jugador(id_red: int) -> String:
+	var pid := str(personajes.get(id_red, ""))
+	if pid == "":
+		var lista := protagonistas()
+		if lista.is_empty(): return ModelosPSX.nombre_para_rol("protagonistas", 0)
+		var indice := 0 if id_red == 1 else 1 + absi(hash(str(id_red))) % maxi(1, lista.size() - 1)
+		return lista[indice % lista.size()].modelo
+	return protagonista(pid).get("modelo", "")

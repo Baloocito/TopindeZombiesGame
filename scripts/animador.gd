@@ -52,8 +52,9 @@ static func para(raiz: Node3D, conjunto: String) -> Animador:
 
 static func _libreria(conjunto: String, esq: Skeleton3D) -> AnimationLibrary:
 	var cadera := esq.find_bone(CADERA)
-	var alto_cadera := esq.get_bone_rest(cadera).origin.y if cadera >= 0 else 1.0
-	var clave := "%s|%d|%d" % [conjunto, esq.get_bone_count(), int(round(alto_cadera * 20.0))]
+	var reposo: Vector3 = esq.get_bone_rest(cadera).origin if cadera >= 0 else Vector3.UP
+	var eje := _eje_vertical(reposo)
+	var clave := "%s|%d|%d|%s" % [conjunto, esq.get_bone_count(), int(round(absf(reposo.dot(eje)) * 20.0)), eje]
 	if _cache.has(clave): return _cache[clave]
 	var huesos := {}
 	for i in esq.get_bone_count(): huesos[esq.get_bone_name(i)] = true
@@ -70,7 +71,7 @@ static func _libreria(conjunto: String, esq: Skeleton3D) -> AnimationLibrary:
 			if hueso != "" and not huesos.has(hueso):
 				anim.remove_track(t)
 			elif hueso == CADERA and anim.track_get_type(t) == Animation.TYPE_POSITION_3D:
-				_fijar_cadera(anim, t, alto_cadera)
+				_fijar_cadera(anim, t, reposo, eje)
 			t -= 1
 		anim.loop_mode = Animation.LOOP_LINEAR if nombre in EN_BUCLE else Animation.LOOP_NONE
 		lib.add_animation(nombre, anim)
@@ -96,16 +97,28 @@ static func _fuente(archivo: String) -> Animation:
 	_fuentes[archivo] = anim
 	return anim
 
-# La cadera queda en el lugar (sin avanzar en X/Z) y a la altura del modelo.
-static func _fijar_cadera(anim: Animation, t: int, alto_cadera: float):
+# Eje "arriba" del espacio donde vive la cadera: casi siempre +Y, pero los
+# modelos que llegan de Tripo -> Mixamo traen el esqueleto con Z hacia arriba.
+static func _eje_vertical(reposo: Vector3) -> Vector3:
+	var a := reposo.abs()
+	if a.y >= a.x and a.y >= a.z: return Vector3.UP * signf(reposo.y if reposo.y != 0.0 else 1.0)
+	if a.z >= a.x: return Vector3.BACK * signf(reposo.z)
+	return Vector3.RIGHT * signf(reposo.x)
+
+# La cadera queda en el lugar (sin avanzar) y a la altura del modelo: la
+# altura de la animación (eje Y del esqueleto de Mixamo) se escala a la del
+# modelo y se pone sobre su eje vertical.
+static func _fijar_cadera(anim: Animation, t: int, reposo: Vector3, eje: Vector3):
 	var n := anim.track_get_key_count(t)
 	if n == 0: return
 	var inicio: Vector3 = anim.track_get_key_value(t, 0)
 	var referencia := float(anim.get_meta("cadera_reposo", inicio.y))
-	var proporcion := alto_cadera / maxf(0.01, referencia)
+	var alto := reposo.dot(eje)
+	var plano := reposo - eje * alto
+	var proporcion := alto / maxf(0.01, referencia)
 	for k in n:
 		var v: Vector3 = anim.track_get_key_value(t, k)
-		anim.track_set_key_value(t, k, Vector3(inicio.x, v.y * proporcion, inicio.z))
+		anim.track_set_key_value(t, k, plano + eje * (v.y * proporcion))
 
 # Cambia de animación solo si hace falta (no reinicia la que ya está sonando).
 func poner(nombre: String, velocidad: float = 1.0):

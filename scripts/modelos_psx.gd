@@ -77,11 +77,24 @@ static func nombre_para_rol(rol: String, indice: int = -1) -> String:
 
 # Instancia el personaje con su textura, escalado a ALTO_PERSONAJE y mirando
 # hacia -Z. Las animaciones de Mixamo se le agregan aparte (mismo esqueleto).
+# `nombre` es un modelo del pack PSX ("Character_29") o una ruta dentro de
+# assets/modelos sin extensión ("KH/leo/leo"): el .fbx y su .png al lado.
+static func ruta_modelo(nombre: String) -> String:
+	if "/" in nombre: return "res://assets/modelos/" + nombre
+	return RUTA_PERSONAJES + "modelos/" + nombre
+
 static func personaje(nombre: String) -> Node3D:
-	var escena = load(RUTA_PERSONAJES + "modelos/" + nombre + ".fbx")
+	var base := ruta_modelo(nombre)
+	var escena = load(base + ".fbx")
 	if not escena: return Node3D.new()
 	var p := escena.instantiate() as Node3D
-	var tex = load(RUTA_PERSONAJES + "modelos/" + nombre + ".png")
+	var tex = load(base + ".png")
+	# Versión con menos polígonos (herramientas/mallas/reducir_mallas.gd).
+	if ResourceLoader.exists(base + "_lp.res"):
+		var lp = load(base + "_lp.res")
+		for m in p.find_children("*", "MeshInstance3D", true, false):
+			(m as MeshInstance3D).mesh = lp
+			break
 	var caja := AABB()
 	var primera := true
 	for m in p.find_children("*", "MeshInstance3D", true, false):

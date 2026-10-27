@@ -219,6 +219,7 @@ func _physics_process(delta: float) -> void:
 		var angulo_objetivo = null
 		if aim_dir.length() > 0.1:
 			angulo_objetivo = atan2(aim_dir.x, aim_dir.y)
+			if Controles.apuntado_asistido: angulo_objetivo = _asistir_apuntado(angulo_objetivo)
 		elif _usa_raton():
 			var punto = _punto_del_raton()
 			if punto != null:
@@ -234,7 +235,7 @@ func _physics_process(delta: float) -> void:
 		# a fondo en el mando si esa opción está activa.
 		var quiere_disparar = (InputMap.has_action("disparar_tactil") and Input.is_action_pressed("disparar_tactil")) \
 			or (Input.is_action_pressed("disparar") and not _raton_sobre_interfaz()) \
-			or (Controles.auto_disparo_mando and not DisplayServer.is_touchscreen_available() and aim_dir.length() > 0.6)
+			or (Controles.auto_disparo_mando and Controles.usando_mando and aim_dir.length() > Controles.umbral_disparo)
 		if quiere_disparar and alineado and can_fire_fase:
 			intentar_disparar()
 
@@ -299,11 +300,29 @@ var _pos_previa_dir := Vector3.ZERO
 
 # Cada jugador tiene su protagonista: el anfitrión el primero, los demás
 # según su nombre de nodo (igual en todas las pantallas).
+# Apuntado asistido (mando y joystick táctil): si hay un zombie a menos de
+# 16 m y dentro de 20° de donde apunta el stick, la mira se va hacia él.
+const ASISTENCIA_GRADOS := 20.0
+const ASISTENCIA_DISTANCIA := 16.0
+func _asistir_apuntado(angulo: float) -> float:
+	var mejor := angulo
+	var mejor_puntaje := INF
+	for e in get_tree().get_nodes_in_group("enemigos"):
+		if not is_instance_valid(e) or e.get("esta_muerto"): continue
+		var d: Vector3 = e.global_position - global_position
+		var dist := Vector2(d.x, d.z).length()
+		if dist > ASISTENCIA_DISTANCIA or dist < 0.3: continue
+		var a := atan2(d.x, d.z)
+		var dif := absf(angle_difference(angulo, a))
+		if dif > deg_to_rad(ASISTENCIA_GRADOS): continue
+		var puntaje := dif * 8.0 + dist * 0.05   # manda el ángulo; a igual ángulo, el más cerca
+		if puntaje < mejor_puntaje:
+			mejor_puntaje = puntaje
+			mejor = a
+	return mejor
+
 func _crear_modelo():
-	var lista: Array = ModelosPSX.roles().get("protagonistas", [])
-	if lista.is_empty(): return
-	var indice := 0 if String(name) == "1" else 1 + absi(hash(String(name))) % maxi(1, lista.size() - 1)
-	var p := ModelosPSX.personaje(lista[indice % lista.size()])
+	var p := ModelosPSX.personaje(EstadoPartida.modelo_de_jugador(String(name).to_int()))
 	p.name = "Modelo"
 	p.rotation.y = PI  # el jugador mira hacia +Z
 	add_child(p)
@@ -438,6 +457,7 @@ func intentar_disparar():
 
 			# 2. Lógica de RED: Le gritamos a todos que generen la bala, pasándole los datos exactos
 			ejecutar_disparo_en_red.rpc(arma_actual.dano, arma_actual.dispersion, arma_actual.balas_por_disparo)
+			Controles.vibrar(0.25 if arma_actual.balas_por_disparo <= 1 else 0.6, 0.0, 0.05)
 		else:
 			recargar()
 
@@ -624,6 +644,7 @@ func recibir_dano(cantidad: int):
 
 	salud_actual -= cantidad
 	actualizar_ui_vida()
+	if is_multiplayer_authority() and cantidad > 0: Controles.vibrar(0.4, 0.8, 0.18)
 	if salud_actual <= 0: quedar_derribado()
 	elif animador and cantidad > 0: animador.accion("impacto", 0.3, 2.0)
 

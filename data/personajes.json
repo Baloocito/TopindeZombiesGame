@@ -1,11 +1,11 @@
 {
- "_nota": "Modelos por rol (assets/modelos/personajes_psx, texturas a 256 px). Todos usan el esqueleto de Mixamo (mixamorig_*), así que cualquier animación de Mixamo les sirve. Las animaciones van en assets/animaciones/mixamo. Excluidos a propósito: el payaso (parecido a un personaje de cine), la máscara de cerdo, camisetas con marcas o bandas, el traje amarillo con cara parecida a un actor y los modelos de bailarina/lencería.",
+ "_nota": "Modelos por rol (assets/modelos/personajes_psx, texturas a 256 px). Todos usan el esqueleto de Mixamo (mixamorig_*), así que cualquier animación de Mixamo les sirve. Las animaciones van en assets/animaciones/mixamo. Excluidos a propósito: el payaso (parecido a un personaje de cine), la máscara de cerdo, camisetas con marcas o bandas, el traje amarillo con cara parecida a un actor y los modelos de bailarina/lencería. Modelos KH: hechos por TopinGames en Tripo3D y rigeados en Mixamo (assets/modelos/KH).",
  "roles": {
   "protagonistas": [
-   "Character_Male_57",
-   "Character_Sheriff_N",
-   "Character_35_Female",
-   "Character_45_Female"
+   "KH/leo/leo",
+   "KH/frank/frank",
+   "KH/miyuki/miyuki",
+   "KH/momo/momo"
   ],
   "basico": [
    "Character_29",
@@ -34,9 +34,7 @@
    "Character_28_Female_HM"
   ],
   "tanque": [
-   "Character_Killer",
-   "Character_Killer_03",
-   "Character_Killer_04"
+   "KH/tanque/tanque"
   ],
   "acechador": [
    "Character_Killer_01",
@@ -54,6 +52,42 @@
   ],
   "hospedero": [
    "Character_Monster_07"
+  ],
+  "protagonistas_psx": [
+   "Character_Male_57",
+   "Character_Sheriff_N",
+   "Character_35_Female",
+   "Character_45_Female"
   ]
- }
+ },
+ "protagonistas": [
+  {
+   "id": "leo",
+   "nombre": "Leo",
+   "modelo": "KH/leo/leo",
+   "color": "#ef4444",
+   "lema": "Líder equilibrado"
+  },
+  {
+   "id": "frank",
+   "nombre": "Frank",
+   "modelo": "KH/frank/frank",
+   "color": "#14b8a6",
+   "lema": "Resistente"
+  },
+  {
+   "id": "miyuki",
+   "nombre": "Miyuki",
+   "modelo": "KH/miyuki/miyuki",
+   "color": "#a855f7",
+   "lema": "Ágil"
+  },
+  {
+   "id": "momo",
+   "nombre": "Momo",
+   "modelo": "KH/momo/momo",
+   "color": "#f97316",
+   "lema": "Apoyo"
+  }
+ ]
 }

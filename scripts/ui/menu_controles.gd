@@ -15,7 +15,7 @@ var _lista: VBoxContainer
 var _tab_teclado: Button
 var _tab_mando: Button
 var _ayuda: Label
-var _opciones: HBoxContainer
+var _opciones: VBoxContainer
 
 static func abrir(padre: Node) -> MenuControles:
 	var m := MenuControles.new()
@@ -59,18 +59,22 @@ func _ready():
 	tabs.add_child(_tab_mando)
 	col.add_child(tabs)
 
-	_opciones = HBoxContainer.new()
-	_opciones.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_child(_opciones)
-
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(580, 270)
+	scroll.custom_minimum_size = Vector2(580, 330)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true   # con el mando, la lista baja sola hasta el botón enfocado
 	col.add_child(scroll)
+	var contenido := VBoxContainer.new()
+	contenido.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	contenido.add_theme_constant_override("separation", 8)
+	scroll.add_child(contenido)
+	_opciones = VBoxContainer.new()
+	_opciones.add_theme_constant_override("separation", 4)
+	contenido.add_child(_opciones)
 	_lista = VBoxContainer.new()
 	_lista.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lista.add_theme_constant_override("separation", 6)
-	scroll.add_child(_lista)
+	contenido.add_child(_lista)
 
 	_ayuda = Label.new()
 	_ayuda.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -101,6 +105,7 @@ func _ready():
 func _boton_tab(texto: String, grupo: String) -> Button:
 	var b := Button.new()
 	b.text = texto
+	b.set_meta("id_control", "tab_" + grupo)
 	b.custom_minimum_size = Vector2(200, 46)
 	b.pressed.connect(func():
 		_grupo = grupo
@@ -109,25 +114,28 @@ func _boton_tab(texto: String, grupo: String) -> Button:
 	return b
 
 func _refrescar():
+	# Al rehacer la lista se pierde el foco: lo devolvemos a la misma fila
+	# (si no, quien usa el mando queda "perdido" después de cada cambio).
+	var enfocado := get_viewport().gui_get_focus_owner()
+	var volver_a := ""
+	if enfocado and enfocado.has_meta("id_control"): volver_a = enfocado.get_meta("id_control")
 	_tab_teclado.theme_type_variation = "OpcionPrimaria" if _grupo == "teclado" else "OpcionVidrio"
 	_tab_mando.theme_type_variation = "OpcionPrimaria" if _grupo == "mando" else "OpcionVidrio"
 	for h in _lista.get_children(): h.queue_free()
 	for h in _opciones.get_children(): h.queue_free()
 	# Opciones de cada pestaña.
-	var op := CheckButton.new()
 	if _grupo == "teclado":
-		op.text = "Apuntar con el ratón (desactiva los joysticks en pantalla)"
-		op.button_pressed = Controles.modo_raton
-		op.toggled.connect(func(v):
-			Controles.modo_raton = v
-			Controles.guardar())
+		_casilla("Apuntar con el ratón (desactiva los joysticks en pantalla)", Controles.modo_raton, _set_modo_raton)
 	else:
-		op.text = "Disparar al empujar el stick derecho a fondo"
-		op.button_pressed = Controles.auto_disparo_mando
-		op.toggled.connect(func(v):
-			Controles.auto_disparo_mando = v
-			Controles.guardar())
-	_opciones.add_child(op)
+		_titulo_seccion("Ajustes del mando")
+		_casilla("Disparar al empujar el stick derecho a fondo", Controles.auto_disparo_mando, _set_auto_disparo)
+		_deslizador("Qué tan a fondo para disparar", Controles.umbral_disparo, 0.3, 0.95, 0.05, _set_umbral)
+		_deslizador("Zona muerta de los sticks", Controles.zona_muerta, 0.05, 0.5, 0.05, _set_zona)
+		_casilla("Apuntado asistido (corrige la mira hacia el zombie más cercano)", Controles.apuntado_asistido, _set_asistido)
+		_casilla("Vibración", Controles.vibracion, _set_vibracion)
+		_deslizador("Fuerza de la vibración", Controles.intensidad_vibracion, 0.1, 1.0, 0.1, _set_intensidad)
+		_casilla("Modo zurdo (mover con el stick derecho, apuntar con el izquierdo)", Controles.sticks_invertidos, _set_zurdo)
+		_titulo_seccion("Botones")
 	for a in Controles.ACCIONES:
 		if a.has("solo") and a.solo != _grupo: continue
 		var fila := HBoxContainer.new()
@@ -139,10 +147,80 @@ func _refrescar():
 		b.custom_minimum_size = Vector2(240, 44)
 		b.text = Controles.texto_accion(a.id, _grupo)
 		var id: String = a.id
+		b.set_meta("id_control", "accion_" + id)
 		b.pressed.connect(func(): _empezar_espera(id, b))
 		fila.add_child(b)
 		_lista.add_child(fila)
-	_ayuda.text = "Toca una acción y presiona la tecla nueva." if _grupo == "teclado" else "Toca una acción y presiona el botón o mueve el stick."
+	_ayuda.text = "Toca una acción y presiona la tecla nueva." if _grupo == "teclado" else "Elige una acción (A) y presiona el botón o mueve el stick."
+	if volver_a != "": _reenfocar.call_deferred(volver_a)
+
+func _reenfocar(id: String):
+	for c in find_children("*", "Control", true, false):
+		if c.has_meta("id_control") and c.get_meta("id_control") == id and c.is_visible_in_tree():
+			(c as Control).grab_focus()
+			return
+
+func _set_modo_raton(v): Controles.modo_raton = v
+func _set_auto_disparo(v): Controles.auto_disparo_mando = v
+func _set_umbral(v): Controles.umbral_disparo = v
+func _set_zona(v):
+	Controles.zona_muerta = v
+	Controles.aplicar_zona_muerta()
+func _set_asistido(v): Controles.apuntado_asistido = v
+func _set_vibracion(v):
+	Controles.vibracion = v
+	if v: Controles.vibrar(0.5, 0.5, 0.2)
+func _set_intensidad(v):
+	Controles.intensidad_vibracion = v
+	Controles.vibrar(0.6, 0.6, 0.15)
+func _set_zurdo(v):
+	Controles.invertir_sticks(v)
+	_refrescar.call_deferred()
+
+func _titulo_seccion(texto: String):
+	var l := Label.new()
+	l.text = texto
+	l.modulate = Color(1, 0.85, 0.4)
+	_opciones.add_child(l)
+
+func _casilla(texto: String, valor: bool, al_cambiar: Callable):
+	var op := CheckButton.new()
+	op.text = texto
+	op.button_pressed = valor
+	op.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	op.set_meta("id_control", "op_" + texto)
+	op.toggled.connect(func(v):
+		al_cambiar.call(v)
+		Controles.guardar())
+	_opciones.add_child(op)
+
+func _deslizador(texto: String, valor: float, minimo: float, maximo: float, paso: float, al_cambiar: Callable):
+	var formato := "%d %%"
+	var factor := 100.0
+	var fila := HBoxContainer.new()
+	var l := Label.new()
+	l.text = texto
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fila.add_child(l)
+	var v := Label.new()
+	v.custom_minimum_size = Vector2(60, 0)
+	v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	v.text = formato % int(round(valor * factor))
+	var s := HSlider.new()
+	s.min_value = minimo
+	s.max_value = maximo
+	s.step = paso
+	s.value = valor
+	s.custom_minimum_size = Vector2(200, 30)
+	s.set_meta("id_control", "op_" + texto)
+	s.value_changed.connect(func(x):
+		v.text = formato % int(round(x * factor))
+		al_cambiar.call(x))
+	s.drag_ended.connect(func(_c): Controles.guardar())
+	s.focus_exited.connect(Controles.guardar)
+	fila.add_child(s)
+	fila.add_child(v)
+	_opciones.add_child(fila)
 
 func _empezar_espera(accion: String, b: Button):
 	_esperando = {"accion": accion, "boton": b}

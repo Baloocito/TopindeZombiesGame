@@ -29,6 +29,7 @@ const ACCIONES := [
 	{"id": "arma_2", "nombre": "Arma 2", "solo": "teclado"},
 	{"id": "arma_3", "nombre": "Arma 3", "solo": "teclado"},
 	{"id": "iniciar_noche", "nombre": "Listo / iniciar noche"},
+	{"id": "menu_interfaz", "nombre": "Usar los menús del día"},
 	{"id": "pausa", "nombre": "Pausa"},
 ]
 
@@ -43,6 +44,7 @@ func _por_defecto() -> Dictionary:
 		"arma_2": [_tecla(KEY_2)],
 		"arma_3": [_tecla(KEY_3)],
 		"iniciar_noche": [_tecla(KEY_ENTER), _boton(JOY_BUTTON_Y)],
+		"menu_interfaz": [_tecla(KEY_TAB), _boton(JOY_BUTTON_BACK)],
 		"pausa": [_tecla(KEY_ESCAPE), _boton(JOY_BUTTON_START)],
 	}
 
@@ -51,7 +53,25 @@ func _por_defecto() -> Dictionary:
 var modo_raton := true
 var auto_disparo_mando := true   # disparar al empujar el stick derecho a fondo
 
+# --- Ajustes del mando (Opciones > Controles > Mando) ---
+var zona_muerta := 0.2           # cuánto hay que mover el stick antes de que cuente
+var umbral_disparo := 0.6        # qué tan a fondo se empuja el stick derecho para disparar
+var apuntado_asistido := true    # el apuntado con stick se corrige hacia el zombie más cercano
+var vibracion := true
+var intensidad_vibracion := 0.7
+var sticks_invertidos := false   # zurdos: mover con el derecho y apuntar con el izquierdo
+
+# Último dispositivo usado: el mando o el resto (teclado, ratón, pantalla).
+# Con mando se dibuja un marco alrededor del botón enfocado y, en el
+# teléfono, se esconden los joysticks de pantalla.
+var usando_mando := false
+var ultimo_mando := 0
+
+const MOVIMIENTO := ["mover_arriba", "mover_abajo", "mover_izq", "mover_der",
+	"apuntar_arriba", "apuntar_abajo", "apuntar_izq", "apuntar_der"]
+
 var _defectos: Dictionary = {}    # acción -> Array[InputEvent] (copia de fábrica)
+var _marco: Control
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -63,7 +83,140 @@ func _ready():
 			InputMap.action_add_event(accion, e)
 	for a in ACCIONES:
 		_defectos[a.id] = InputMap.action_get_events(a.id).duplicate()
+	_preparar_menus()
 	cargar()
+	_crear_marco()
+
+# ----------------------------------------------------------
+# MANDO EN LOS MENÚS
+# ----------------------------------------------------------
+# Godot navega los menús con ui_up/ui_down/ui_accept/ui_cancel, pero solo si
+# algún botón tiene el foco: sin eso el mando "no hace nada". Acá:
+#   - el stick izquierdo también navega (de fábrica solo la cruceta);
+#   - si nadie tiene el foco, el primer toque del mando enfoca un botón del
+#     menú que está más adelante (la capa más alta);
+#   - un marco dorado muestra dónde está el foco (muchos botones del HUD no
+#     tienen estilo de foco propio).
+func _preparar_menus():
+	var ejes := {"ui_up": [JOY_AXIS_LEFT_Y, -1.0], "ui_down": [JOY_AXIS_LEFT_Y, 1.0],
+		"ui_left": [JOY_AXIS_LEFT_X, -1.0], "ui_right": [JOY_AXIS_LEFT_X, 1.0]}
+	for accion in ejes.keys():
+		var e := _eje(ejes[accion][0], ejes[accion][1])
+		if not InputMap.action_has_event(accion, e): InputMap.action_add_event(accion, e)
+	var botones := {"ui_accept": JOY_BUTTON_A, "ui_cancel": JOY_BUTTON_B}
+	for accion in botones.keys():
+		var b := _boton(botones[accion])
+		if not InputMap.action_has_event(accion, b): InputMap.action_add_event(accion, b)
+
+func _input(event: InputEvent):
+	if es_de_mando(event):
+		if event is InputEventJoypadButton or absf(event.axis_value) > 0.4:
+			usando_mando = true
+			ultimo_mando = event.device
+	elif event is InputEventMouseMotion:
+		if event.relative.length() > 2.0: usando_mando = false
+	elif event is InputEventKey or event is InputEventScreenTouch or event is InputEventMouseButton:
+		usando_mando = false
+	if not es_de_mando(event): return
+	var navega := false
+	for a in ["ui_up", "ui_down", "ui_left", "ui_right", "ui_accept"]:
+		if event.is_action_pressed(a): navega = true
+	if navega and get_viewport().gui_get_focus_owner() == null:
+		if enfocar_en(null):
+			get_viewport().set_input_as_handled()
+
+# Da el foco al primer control usable dentro de `raiz` (o, si es null, del
+# menú más adelante en pantalla). Devuelve true si encontró uno.
+func enfocar_en(raiz: Node, solo_con_mando: bool = false) -> bool:
+	if solo_con_mando and not usando_mando: return false
+	var candidatos := _enfocables(raiz if raiz else get_tree().root)
+	if candidatos.is_empty(): return false
+	# La capa más alta manda; dentro de ella, el botón principal si hay uno.
+	var mejor: Control = null
+	var capa_mejor := -INF
+	for c in candidatos:
+		var capa := _capa(c)
+		var principal: bool = c is BaseButton and String(c.theme_type_variation) == "BotonPrimario"
+		var mejor_principal: bool = mejor is BaseButton and String(mejor.theme_type_variation) == "BotonPrimario"
+		if capa > capa_mejor or (capa == capa_mejor and principal and not mejor_principal):
+			capa_mejor = capa
+			mejor = c
+	mejor.grab_focus()
+	return true
+
+func _enfocables(raiz: Node) -> Array:
+	var lista: Array = []
+	for n in raiz.find_children("*", "Control", true, false):
+		var c := n as Control
+		if c.focus_mode == Control.FOCUS_NONE or not c.is_visible_in_tree(): continue
+		if not (c is BaseButton or c is Range or c is ItemList or c is LineEdit): continue
+		if c is BaseButton and (c as BaseButton).disabled: continue
+		if _excluido(c): continue
+		lista.append(c)
+	return lista
+
+# El HUD de juego no se enfoca solo (si no, el mando saltaría a sus botones en
+# plena pelea): se entra con "Usar los menús del día" (Select / Tab).
+func _excluido(c: Node) -> bool:
+	var n := c
+	while n:
+		if n.is_in_group("sin_foco_auto"): return true
+		n = n.get_parent()
+	return false
+
+func _capa(c: Control) -> float:
+	var n: Node = c
+	while n:
+		if n is CanvasLayer: return float((n as CanvasLayer).layer)
+		n = n.get_parent()
+	return 0.0
+
+func _crear_marco():
+	var capa := CanvasLayer.new()
+	capa.layer = 128
+	add_child(capa)
+	_marco = Control.new()
+	_marco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_marco.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_marco.draw.connect(_dibujar_marco)
+	capa.add_child(_marco)
+
+func _process(_delta):
+	if _marco: _marco.queue_redraw()
+
+func _dibujar_marco():
+	if not usando_mando: return
+	var f := get_viewport().gui_get_focus_owner()
+	if not f or not f.is_visible_in_tree(): return
+	var r := f.get_global_rect().grow(4)
+	var pulso := 0.6 + 0.4 * sin(Time.get_ticks_msec() / 160.0)
+	_marco.draw_rect(r, Color(1.0, 0.82, 0.3, pulso), false, 3.0)
+
+# ----------------------------------------------------------
+# VIBRACIÓN Y AJUSTES DEL STICK
+# ----------------------------------------------------------
+func vibrar(debil: float, fuerte: float, duracion: float):
+	if not vibracion or not usando_mando: return
+	Input.start_joy_vibration(ultimo_mando, clampf(debil * intensidad_vibracion, 0, 1), clampf(fuerte * intensidad_vibracion, 0, 1), duracion)
+
+func aplicar_zona_muerta():
+	for a in MOVIMIENTO:
+		if InputMap.has_action(a): InputMap.action_set_deadzone(a, zona_muerta)
+
+# Cambia los ejes del stick izquierdo por los del derecho (y al revés) en
+# las acciones de mover y apuntar.
+func invertir_sticks(valor: bool):
+	if valor == sticks_invertidos: return
+	sticks_invertidos = valor
+	var cambio := {JOY_AXIS_LEFT_X: JOY_AXIS_RIGHT_X, JOY_AXIS_RIGHT_X: JOY_AXIS_LEFT_X,
+		JOY_AXIS_LEFT_Y: JOY_AXIS_RIGHT_Y, JOY_AXIS_RIGHT_Y: JOY_AXIS_LEFT_Y}
+	for a in MOVIMIENTO:
+		for e in InputMap.action_get_events(a):
+			if e is InputEventJoypadMotion and cambio.has(e.axis):
+				var nuevo := _eje(cambio[e.axis], e.axis_value)
+				InputMap.action_erase_event(a, e)
+				InputMap.action_add_event(a, nuevo)
+	guardar()
 
 # ----------------------------------------------------------
 func es_de_mando(e: InputEvent) -> bool:
@@ -94,6 +247,13 @@ func restablecer():
 		for e in _defectos[a.id]: InputMap.action_add_event(a.id, e)
 	modo_raton = not DisplayServer.is_touchscreen_available()
 	auto_disparo_mando = true
+	zona_muerta = 0.2
+	umbral_disparo = 0.6
+	apuntado_asistido = true
+	vibracion = true
+	intensidad_vibracion = 0.7
+	sticks_invertidos = false
+	aplicar_zona_muerta()
 	guardar()
 
 func _iguales(a: InputEvent, b: InputEvent) -> bool:
@@ -112,11 +272,15 @@ func guardar():
 		cfg.set_value("acciones", a.id, InputMap.action_get_events(a.id))
 	cfg.set_value("opciones", "modo_raton", modo_raton)
 	cfg.set_value("opciones", "auto_disparo_mando", auto_disparo_mando)
+	for clave in ["zona_muerta", "umbral_disparo", "apuntado_asistido", "vibracion", "intensidad_vibracion", "sticks_invertidos"]:
+		cfg.set_value("mando", clave, get(clave))
 	cfg.save(RUTA)
 
 func cargar():
 	var cfg := ConfigFile.new()
-	if cfg.load(RUTA) != OK: return
+	if cfg.load(RUTA) != OK:
+		aplicar_zona_muerta()
+		return
 	for a in ACCIONES:
 		var lista = cfg.get_value("acciones", a.id, null)
 		if typeof(lista) != TYPE_ARRAY: continue
@@ -125,6 +289,9 @@ func cargar():
 			if e is InputEvent: InputMap.action_add_event(a.id, e)
 	modo_raton = bool(cfg.get_value("opciones", "modo_raton", modo_raton))
 	auto_disparo_mando = bool(cfg.get_value("opciones", "auto_disparo_mando", true))
+	for clave in ["zona_muerta", "umbral_disparo", "apuntado_asistido", "vibracion", "intensidad_vibracion", "sticks_invertidos"]:
+		set(clave, cfg.get_value("mando", clave, get(clave)))
+	aplicar_zona_muerta()
 
 # ----------------------------------------------------------
 # NOMBRES PARA MOSTRAR
