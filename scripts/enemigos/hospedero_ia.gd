@@ -138,6 +138,7 @@ func _entrar_fase(nueva: int):
 		_crear_nodos(true)
 
 func procesar(delta: float):
+	_animar_si_cambio()
 	# El estado "quieto" de la transición dura t_estado.
 	if estado == "quieto":
 		t_estado -= delta
@@ -256,3 +257,7 @@ func al_morir():
 	_nodos.clear()
 	if jefes: jefes.limpiar_zonas()
 	super.al_morir()
+
+func anim_estado(est: String, atq: String) -> Array:
+	if est == "aviso" and atq == "lanzamiento": return ["golpe", 1.0, 2.6]
+	return super.anim_estado(est, atq)

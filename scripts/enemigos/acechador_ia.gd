@@ -71,3 +71,8 @@ func procesar_accion(delta: float) -> bool:
 
 func duracion_recuperacion(_nombre: String) -> float:
 	return 0.9 if not _furioso else 0.6
+
+func anim_estado(est: String, atq: String) -> Array:
+	if est == "aviso": return ["salto", 1.3, 2.8]
+	if est == "accion": return []
+	return super.anim_estado(est, atq)

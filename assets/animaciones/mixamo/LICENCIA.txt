@@ -1,0 +1,5 @@
+Animaciones de Mixamo (mixamo.com, Adobe). Gratis y libres de regalías para usar
+dentro de juegos, también comerciales. No se pueden redistribuir sueltas (fuera
+del juego). Descargadas sin piel ("Without Skin"), FBX, 30 fps.
+Nombres originales: Zombie Walk/Idle/Punching/Death, Run Forward, Pistol Idle/Run,
+Rifle Idle/Run, Dying (prota_muerte), Mutant Run/Swiping/Jump Attack/Roaring/Dying.

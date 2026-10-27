@@ -50,7 +50,24 @@ func al_morir():
 	if jefes: jefes.jefe_murio()
 
 # ----------------------------------------------------------
+# Animación que acompaña cada estado: [nombre, duración, velocidad] o [].
+func anim_estado(est: String, _ataque: String) -> Array:
+	match est:
+		"aviso": return ["golpe", float(datos_ataque.get("aviso", 1.0)) + 0.6, 1.6]
+		"aturdido": return ["reposo", t_estado, 1.0]
+		"quieto": return ["rugido", t_estado, 2.0]
+	return []
+
+var _estado_animado := ""
+func _animar_si_cambio():
+	if estado == _estado_animado: return
+	_estado_animado = estado
+	var a := anim_estado(estado, ataque)
+	if not a.is_empty() and z.has_method("animar_en_red"):
+		z.animar_en_red.rpc(a[0], a[1], a[2])
+
 func procesar(delta: float):
+	_animar_si_cambio()
 	for k in cooldowns.keys():
 		cooldowns[k] = maxf(0.0, cooldowns[k] - delta)
 	_t_objetivo -= delta

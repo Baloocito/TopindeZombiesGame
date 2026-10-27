@@ -148,3 +148,9 @@ func modificar_dano(cantidad: int, direccion: Vector3) -> int:
 			texto("ARMADURA", Color(0.7, 0.75, 0.8), "armadura", 0.8)
 			return maxi(1, int(cantidad * REDUCCION_FRENTE))
 	return cantidad
+
+func anim_estado(est: String, atq: String) -> Array:
+	if est == "aviso" and atq == "embestida": return ["rugido", float(datos_ataque.get("aviso", 0.9)), 2.6]
+	if est == "accion" and atq == "embestida": return ["correr", 1.4, 2.2]
+	if est == "aviso" and atq == "rugido": return ["rugido", 1.6, 2.4]
+	return super.anim_estado(est, atq)

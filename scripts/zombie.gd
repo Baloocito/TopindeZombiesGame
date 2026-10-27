@@ -49,6 +49,64 @@ func _ready():
 	# tipo_zombie llega con el spawn: cada pantalla pinta el enemigo según su tipo.
 	_aplicar_aspecto.call_deferred()
 
+# ----------------------------------------------------------
+# MODELO Y ANIMACIONES (personajes PSX + Mixamo)
+# ----------------------------------------------------------
+const ROL_POR_TIPO := {"basico": "basico", "corredor": "corredor", "explosivo": "explosivo",
+	"tanque": "tanque", "acechador": "acechador", "guardian": "guardian",
+	"mosca_titan": "mosca_titan", "mosca_titan_plus": "mosca_titan", "hospedero": "hospedero"}
+const TIPOS_JEFE_ANIM := ["acechador", "guardian", "mosca_titan", "mosca_titan_plus", "hospedero"]
+var animador: Animador = null
+var _pos_previa := Vector3.INF
+var _rapidez := 0.0
+
+func _crear_modelo(contenedor: Node3D):
+	var rol: String = ROL_POR_TIPO.get(tipo_zombie, "basico")
+	var lista: Array = ModelosPSX.roles().get(rol, [])
+	if lista.is_empty():
+		contenedor.add_child(ModelosPSX.zombie())
+		return
+	# El mismo nombre de nodo en todas las pantallas => el mismo modelo.
+	var nombre_modelo: String = lista[absi(hash(String(name))) % lista.size()]
+	var p := ModelosPSX.personaje(nombre_modelo)
+	contenedor.add_child(p)
+	animador = Animador.para(p.get_child(0), "jefe" if tipo_zombie in TIPOS_JEFE_ANIM else "zombie")
+	animador.poner("reposo")
+	animador.seek(randf() * 2.0, true)
+
+# Corre en todas las pantallas: la animación sale de cuánto se movió.
+func _process(delta: float) -> void:
+	if not animador or esta_muerto or delta <= 0.0: return
+	var p := global_position
+	if _pos_previa != Vector3.INF:
+		var v := Vector2(p.x - _pos_previa.x, p.z - _pos_previa.z).length() / delta
+		_rapidez = lerpf(_rapidez, v, minf(1.0, delta * 8.0))
+	_pos_previa = p
+	var esc := maxf(0.5, scale.x)
+	var r := _rapidez / esc
+	if r < 0.25:
+		animador.poner("reposo")
+	elif r > 2.6 or tipo_zombie in ["corredor", "acechador"]:
+		animador.poner("correr", clampf(r / 3.5, 0.6, 1.8))
+	else:
+		animador.poner("caminar", clampf(r / 0.9, 0.8, 2.6))
+
+# El servidor avisa a todas las pantallas que suene una acción.
+@rpc("authority", "call_local", "unreliable")
+func animar_en_red(nombre: String, duracion: float = -1.0, velocidad: float = 1.0):
+	if animador: animador.accion(nombre, duracion, velocidad)
+
+# Muerte: animación en todas las pantallas y el cuerpo se borra después.
+@rpc("authority", "call_local", "reliable")
+func morir_en_red():
+	esta_muerto = true
+	remove_from_group("enemigos")
+	remove_from_group("jefes")
+	collision_layer = 0
+	collision_mask = 1
+	if animador: animador.morir()
+	if has_node("SombraPS1"): $SombraPS1.visible = false
+
 func _aplicar_aspecto():
 	var datos := Balance.zombie(tipo_zombie)
 	var modelo := get_node_or_null("zombie_run") as Node3D
@@ -72,8 +130,9 @@ func _aplicar_aspecto():
 	# Modelo animado (assets/modelos/zombie_psx). La caminata va más rápida
 	# en los tipos rápidos; el tipo se conoce en todas las pantallas.
 	if modelo and modelo.get_child_count() == 0:
-		var vel_base := float(datos.get("velocidad", 1.8))
-		modelo.add_child(ModelosPSX.zombie(clampf(vel_base / 1.8, 0.7, 2.4)))
+		_crear_modelo(modelo)
+	if modelo and tipo_zombie == "basico":
+		PS1.aplicar_tinte(modelo, Color("#7f9c6b"), 0.3)
 	if not datos.has("color") or not modelo: return
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(datos["color"], 0.45)
@@ -227,6 +286,7 @@ func detener_movimiento():
 # ==========================================================
 func atacar(objetivo):
 	puede_atacar = false
+	if not ia: animar_en_red.rpc("golpe", 0.9, 1.6)
 	if is_instance_valid(objetivo):
 		# Antes solo se buscaba recibir_dano_en_red, que las estructuras no
 		# tienen: los zombies nunca dañaban barricadas ni torretas.
@@ -289,6 +349,11 @@ func recibir_dano(cantidad: int, direccion: Vector3 = Vector3.ZERO):
 			if mundo.has_method("zombie_eliminado"): mundo.zombie_eliminado()
 			if mundo.has_method("spawn_loot"): mundo.spawn_loot(global_position, tipo_zombie)
 
-		# Al borrarse en el Servidor, el MultiplayerSpawner de Godot
-		# lo borra automáticamente en los clientes.
-		queue_free()
+		# Se queda en el suelo con su animación de muerte y se borra un poco
+		# después; al borrarse en el servidor, el MultiplayerSpawner lo borra
+		# en los clientes.
+		if animador and tipo_zombie != "nodo":
+			morir_en_red.rpc()
+			get_tree().create_timer(3.0 if Balance.es_jefe(tipo_zombie) else 2.0).timeout.connect(queue_free)
+		else:
+			queue_free()

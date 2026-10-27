@@ -113,6 +113,8 @@ func _ready():
 	for tipo in municion_reserva.keys(): municion_reserva[tipo] = int(municion_reserva[tipo])
 	salud_actual = stat_salud_maxima
 
+	_crear_modelo()
+
 	# Arma visible: todos empiezan con la pistola; los cambios viajan por RPC
 	# un momento después de aparecer (cuando el nodo ya existe en todas las pantallas).
 	arma_visual_en_red("Pistol_variant_two")
@@ -282,6 +284,69 @@ func cambiar_arma(slot: int):
 		arma_visual_en_red(_modelo_de_arma(arma_actual))
 
 # ----------------------------------------------------------
+# PERSONAJE (modelo PSX + animaciones de Mixamo)
+# ----------------------------------------------------------
+var animador: Animador = null
+var _modelo_arma := "Pistol_variant_two"
+var _arma_visual: Node3D = null
+var _mano_der: BoneAttachment3D = null
+var _mano_izq: BoneAttachment3D = null
+var _pos_previa_anim := Vector3.INF
+var _rapidez_anim := 0.0
+var _estaba_caido := false
+
+# Cada jugador tiene su protagonista: el anfitrión el primero, los demás
+# según su nombre de nodo (igual en todas las pantallas).
+func _crear_modelo():
+	var lista: Array = ModelosPSX.roles().get("protagonistas", [])
+	if lista.is_empty(): return
+	var indice := 0 if String(name) == "1" else 1 + absi(hash(String(name))) % maxi(1, lista.size() - 1)
+	var p := ModelosPSX.personaje(lista[indice % lista.size()])
+	p.name = "Modelo"
+	p.rotation.y = PI  # el jugador mira hacia +Z
+	add_child(p)
+	animador = Animador.para(p.get_child(0), "prota")
+	var esq := p.find_child("Skeleton3D", true, false) as Skeleton3D
+	if esq and esq.find_bone("mixamorig_RightHand") >= 0:
+		_mano_der = BoneAttachment3D.new()
+		_mano_der.bone_name = "mixamorig_RightHand"
+		esq.add_child(_mano_der)
+		_mano_izq = BoneAttachment3D.new()
+		_mano_izq.bone_name = "mixamorig_LeftHand"
+		esq.add_child(_mano_izq)
+	animador.poner("pistola_reposo")
+	if has_node("MeshInstance3D"): $MeshInstance3D.visible = false  # la cápsula queda solo como colisión
+
+func _process(delta: float) -> void:
+	if not animador or delta <= 0.0: return
+	if esta_caido:
+		if not _estaba_caido: animador.morir()
+		_estaba_caido = true
+		return
+	if _estaba_caido:
+		_estaba_caido = false
+		animador.revivir()
+	var p := global_position
+	if _pos_previa_anim != Vector3.INF:
+		var v := Vector2(p.x - _pos_previa_anim.x, p.z - _pos_previa_anim.z).length() / delta
+		_rapidez_anim = lerpf(_rapidez_anim, v, minf(1.0, delta * 10.0))
+	_pos_previa_anim = p
+	_apuntar_arma_larga()
+	var arma := "rifle" if _modelo_arma == "Shotgun" else "pistola"
+	if _rapidez_anim > 0.4:
+		animador.poner(arma + "_correr", clampf(_rapidez_anim / 3.5, 0.7, 1.6))
+	else:
+		animador.poner(arma + "_reposo")
+
+# La escopeta va de la mano derecha hacia la izquierda, como la sostiene la animación.
+func _apuntar_arma_larga():
+	if _modelo_arma != "Shotgun" or not is_instance_valid(_arma_visual) or not _mano_izq: return
+	var a := _mano_der.global_position
+	var dir := _mano_izq.global_position - a
+	if dir.length() < 0.05: return
+	_arma_visual.global_transform = Transform3D(Basis.looking_at(dir.normalized(), Vector3.UP), a)
+
+# ----------------------------------------------------------
 # ARMA EN LA MANO (modelos del PSX Asset Pack 3)
 # ----------------------------------------------------------
 var _arma_visual_en_red_lista := false
@@ -297,15 +362,24 @@ func _modelo_de_arma(arma: ArmaData) -> String:
 func arma_visual_en_red(modelo: String):
 	var remitente := multiplayer.get_remote_sender_id()
 	if remitente != 0 and remitente != get_multiplayer_authority(): return
-	var vieja := get_node_or_null("ArmaVisual")
-	if vieja: vieja.free()
+	var vieja = _arma_visual
+	if is_instance_valid(vieja): vieja.free()
+	_arma_visual = null
+	_modelo_arma = modelo
 	if modelo == "": return
-	var largo := 1.1 if modelo == "Shotgun" else 0.55
+	var largo := (1.0 if modelo == "Shotgun" else 0.42) if _mano_der else (1.1 if modelo == "Shotgun" else 0.55)
 	var arma := ModelosPSX.objeto(modelo, largo)
 	arma.name = "ArmaVisual"
-	# El jugador mira hacia +Z: el arma va a la derecha, a la altura del pecho.
-	arma.position = Vector3(-0.38, 0.95, 0.45 + largo * 0.3)
-	add_child(arma)
+	if _mano_der:
+		# En la mano del personaje. La pistola va fija; la escopeta se orienta
+		# cada cuadro hacia la otra mano (ver _apuntar_arma_larga).
+		_mano_der.add_child(arma)
+		if modelo != "Shotgun": arma.rotation_degrees = Vector3(90, 0, 0)
+	else:
+		# Sin modelo animado: frente al pecho, a la derecha.
+		arma.position = Vector3(-0.38, 0.95, 0.45 + largo * 0.3)
+		add_child(arma)
+	_arma_visual = arma
 	if modelo == "Lower_poly_pistol_variant":
 		PS1.aplicar_tinte(arma, Color(0.3, 0.8, 1.0), 0.35)
 
@@ -549,7 +623,7 @@ func quedar_derribado():
 	# Sacrificamos el efecto de "aplastado" por uno de "encogido", pero sigue
 	# siendo visualmente claro que el jugador está fuera de combate, y no
 	# rompe la física.
-	scale = Vector3(0.55, 0.55, 0.55)
+	if not animador: scale = Vector3(0.55, 0.55, 0.55)  # con modelo animado, cae al suelo
 
 	# Solo la instancia del SERVIDOR evalúa si esto significa Game Over
 	# (evita que cada cliente dispare su propia comprobación redundante).
