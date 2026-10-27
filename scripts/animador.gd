@@ -13,14 +13,19 @@ class_name Animador
 
 const RUTA := "res://assets/animaciones/mixamo/"
 const CONJUNTOS := {
-	"zombie": {"reposo": "zombie_reposo", "caminar": "zombie_caminar", "correr": "correr",
-		"golpe": "zombie_golpe", "muerte": "zombie_muerte"},
+	"zombie": {"reposo": "zombie_reposo", "caminar": "zombie_caminar", "correr": "zombie_correr",
+		"golpe": "zombie_golpe", "mordida": "zombie_mordida", "grito": "zombie_grito",
+		"impacto": "zombie_impacto", "arrastre": "zombie_arrastre", "muerte": "zombie_muerte"},
 	"prota": {"pistola_reposo": "pistola_reposo", "pistola_correr": "pistola_correr",
-		"rifle_reposo": "rifle_reposo", "rifle_correr": "rifle_correr", "muerte": "prota_muerte"},
-	"jefe": {"reposo": "zombie_reposo", "caminar": "zombie_caminar", "correr": "jefe_correr",
+		"pistola_atras": "pistola_atras", "pistola_lado": "pistola_lado", "pistola_recarga": "pistola_recarga",
+		"rifle_reposo": "rifle_reposo", "rifle_correr": "rifle_correr", "rifle_atras": "rifle_atras",
+		"rifle_izq": "rifle_izq", "rifle_der": "rifle_der", "rifle_recarga": "rifle_recarga",
+		"impacto": "prota_impacto", "muerte": "prota_muerte"},
+	"jefe": {"reposo": "jefe_reposo", "caminar": "jefe_caminar", "correr": "jefe_correr",
 		"golpe": "jefe_golpe", "salto": "jefe_salto", "rugido": "jefe_rugido", "muerte": "jefe_muerte"},
 }
-const EN_BUCLE := ["reposo", "caminar", "correr", "pistola_reposo", "pistola_correr", "rifle_reposo", "rifle_correr"]
+const EN_BUCLE := ["reposo", "caminar", "correr", "arrastre", "pistola_reposo", "pistola_correr", "pistola_atras",
+	"pistola_lado", "rifle_reposo", "rifle_correr", "rifle_atras", "rifle_izq", "rifle_der"]
 const CADERA := "mixamorig_Hips"
 
 static var _cache: Dictionary = {}      # clave -> AnimationLibrary
@@ -57,6 +62,7 @@ static func _libreria(conjunto: String, esq: Skeleton3D) -> AnimationLibrary:
 		var fuente := _fuente(CONJUNTOS[conjunto][nombre])
 		if not fuente: continue
 		var anim := fuente.duplicate(true) as Animation
+		if fuente.has_meta("cadera_reposo"): anim.set_meta("cadera_reposo", fuente.get_meta("cadera_reposo"))
 		var t := anim.get_track_count() - 1
 		while t >= 0:
 			var ruta := anim.track_get_path(t)
@@ -80,6 +86,12 @@ static func _fuente(archivo: String) -> Animation:
 		var ap := n.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		if ap and not ap.get_animation_list().is_empty():
 			anim = ap.get_animation(ap.get_animation_list()[0])
+			# Altura de la cadera del esqueleto con que se exportó: es la
+			# referencia para escalar (no el primer cuadro, que en el
+			# arrastre o la muerte ya está agachado).
+			var esq := n.find_child("Skeleton3D", true, false) as Skeleton3D
+			if esq and esq.find_bone(CADERA) >= 0:
+				anim.set_meta("cadera_reposo", esq.get_bone_rest(esq.find_bone(CADERA)).origin.y)
 		n.free()
 	_fuentes[archivo] = anim
 	return anim
@@ -89,7 +101,8 @@ static func _fijar_cadera(anim: Animation, t: int, alto_cadera: float):
 	var n := anim.track_get_key_count(t)
 	if n == 0: return
 	var inicio: Vector3 = anim.track_get_key_value(t, 0)
-	var proporcion := alto_cadera / maxf(0.01, inicio.y)
+	var referencia := float(anim.get_meta("cadera_reposo", inicio.y))
+	var proporcion := alto_cadera / maxf(0.01, referencia)
 	for k in n:
 		var v: Vector3 = anim.track_get_key_value(t, k)
 		anim.track_set_key_value(t, k, Vector3(inicio.x, v.y * proporcion, inicio.z))
@@ -109,7 +122,7 @@ func accion(nombre: String, duracion: float = -1.0, velocidad: float = 1.0):
 	actual = nombre
 	speed_scale = velocidad
 	play(nombre, 0.1)
-	var largo := get_animation(nombre).length / maxf(0.01, velocidad)
+	var largo := get_animation(nombre).length / maxf(0.01, absf(velocidad))
 	_accion_hasta = Time.get_ticks_msec() / 1000.0 + (duracion if duracion > 0.0 else largo)
 
 func terminar_accion():

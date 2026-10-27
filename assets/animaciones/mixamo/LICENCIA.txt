@@ -3,3 +3,5 @@ dentro de juegos, también comerciales. No se pueden redistribuir sueltas (fuera
 del juego). Descargadas sin piel ("Without Skin"), FBX, 30 fps.
 Nombres originales: Zombie Walk/Idle/Punching/Death, Run Forward, Pistol Idle/Run,
 Rifle Idle/Run, Dying (prota_muerte), Mutant Run/Swiping/Jump Attack/Roaring/Dying.
+Segunda tanda: Mutant Idle/Walking, Pistol Run Backward, Pistol Strafe, Reload, Reload rifle,
+rifle Run Backwards, Rifle Strafe Left/Right, run Hit Reaction, Zombie Bite/Crawl/Reaction Hit/Run/Scream.

@@ -57,6 +57,8 @@ const ROL_POR_TIPO := {"basico": "basico", "corredor": "corredor", "explosivo": 
 	"mosca_titan": "mosca_titan", "mosca_titan_plus": "mosca_titan", "hospedero": "hospedero"}
 const TIPOS_JEFE_ANIM := ["acechador", "guardian", "mosca_titan", "mosca_titan_plus", "hospedero"]
 var animador: Animador = null
+var arrastrando := false   # malherido: sigue avanzando, a rastras
+var _t_impacto := 0.0
 var _pos_previa := Vector3.INF
 var _rapidez := 0.0
 
@@ -73,6 +75,9 @@ func _crear_modelo(contenedor: Node3D):
 	animador = Animador.para(p.get_child(0), "jefe" if tipo_zombie in TIPOS_JEFE_ANIM else "zombie")
 	animador.poner("reposo")
 	animador.seek(randf() * 2.0, true)
+	# Uno de cada tres zombies comunes aparece gritando (igual en todas las pantallas).
+	if tipo_zombie in ["basico", "corredor", "tanque"] and absi(hash(String(name))) % 3 == 0:
+		animador.accion("grito", 1.4, 2.0)
 
 # Corre en todas las pantallas: la animación sale de cuánto se movió.
 func _process(delta: float) -> void:
@@ -84,7 +89,9 @@ func _process(delta: float) -> void:
 	_pos_previa = p
 	var esc := maxf(0.5, scale.x)
 	var r := _rapidez / esc
-	if r < 0.25:
+	if arrastrando:
+		animador.poner("arrastre", clampf(r / 0.45, 0.6, 2.4))
+	elif r < 0.25:
 		animador.poner("reposo")
 	elif r > 2.6 or tipo_zombie in ["corredor", "acechador"]:
 		animador.poner("correr", clampf(r / 3.5, 0.6, 1.8))
@@ -95,6 +102,13 @@ func _process(delta: float) -> void:
 @rpc("authority", "call_local", "unreliable")
 func animar_en_red(nombre: String, duracion: float = -1.0, velocidad: float = 1.0):
 	if animador: animador.accion(nombre, duracion, velocidad)
+
+# Zombie malherido que cae y sigue a rastras (más lento).
+@rpc("authority", "call_local", "reliable")
+func arrastrar_en_red():
+	arrastrando = true
+	velocidad *= 0.4
+	if animador: animador.terminar_accion()
 
 # Muerte: animación en todas las pantallas y el cuerpo se borra después.
 @rpc("authority", "call_local", "reliable")
@@ -286,7 +300,9 @@ func detener_movimiento():
 # ==========================================================
 func atacar(objetivo):
 	puede_atacar = false
-	if not ia: animar_en_red.rpc("golpe", 0.9, 1.6)
+	if not ia:
+		if randf() < 0.35: animar_en_red.rpc("mordida", 1.0, 2.6)
+		else: animar_en_red.rpc("golpe", 0.9, 1.6)
 	if is_instance_valid(objetivo):
 		# Antes solo se buscaba recibir_dano_en_red, que las estructuras no
 		# tienen: los zombies nunca dañaban barricadas ni torretas.
@@ -339,6 +355,15 @@ func recibir_dano(cantidad: int, direccion: Vector3 = Vector3.ZERO):
 
 	salud_actual -= cantidad
 	if ia: ia.al_recibir_dano(cantidad)
+	elif salud_actual > 0 and animador:
+		# Sacudón al recibir un tiro (como mucho uno por segundo por zombie).
+		var ahora := Time.get_ticks_msec() / 1000.0
+		if ahora - _t_impacto > 1.0 and not arrastrando:
+			_t_impacto = ahora
+			animar_en_red.rpc("impacto", 0.35, 2.2)
+		# Algunos caen malheridos y siguen arrastrándose.
+		if not arrastrando and tipo_zombie in ["basico", "tanque"] and salud_actual < salud_maxima * 0.35 and randf() < 0.35:
+			arrastrar_en_red.rpc()
 
 	if salud_actual <= 0:
 		esta_muerto = true

@@ -294,6 +294,8 @@ var _mano_izq: BoneAttachment3D = null
 var _pos_previa_anim := Vector3.INF
 var _rapidez_anim := 0.0
 var _estaba_caido := false
+var _dir_mov := Vector3.ZERO
+var _pos_previa_dir := Vector3.ZERO
 
 # Cada jugador tiene su protagonista: el anfitrión el primero, los demás
 # según su nombre de nodo (igual en todas las pantallas).
@@ -333,10 +335,37 @@ func _process(delta: float) -> void:
 	_pos_previa_anim = p
 	_apuntar_arma_larga()
 	var arma := "rifle" if _modelo_arma == "Shotgun" else "pistola"
-	if _rapidez_anim > 0.4:
-		animador.poner(arma + "_correr", clampf(_rapidez_anim / 3.5, 0.7, 1.6))
-	else:
+	if _rapidez_anim <= 0.4:
 		animador.poner(arma + "_reposo")
+		return
+	# Hacia dónde camino respecto de hacia dónde miro (apuntar y caminar
+	# hacia otro lado es lo normal en este juego).
+	var mov := Vector3(p.x - _pos_previa_dir.x, 0, p.z - _pos_previa_dir.z)
+	if mov.length() > 0.001: _dir_mov = _dir_mov.lerp(mov.normalized(), minf(1.0, delta * 10.0))
+	_pos_previa_dir = p
+	var adelante := global_basis.z.normalized()     # el jugador mira hacia +Z local
+	var izquierda := global_basis.x.normalized()
+	var f := _dir_mov.dot(adelante)
+	var l := _dir_mov.dot(izquierda)
+	var vel := clampf(_rapidez_anim / 3.5, 0.7, 1.6)
+	if absf(f) >= absf(l):
+		animador.poner(arma + ("_correr" if f > 0 else "_atras"), vel)
+	elif arma == "rifle":
+		animador.poner("rifle_izq" if l > 0 else "rifle_der", vel)
+	else:
+		# Solo hay strafe hacia un lado: hacia el otro se reproduce al revés.
+		animador.poner("pistola_lado", vel if l > 0 else -vel)
+
+# Recarga: solo se ve si el personaje está quieto (la animación es de cuerpo
+# entero y si corre se vería deslizándose).
+@rpc("any_peer", "call_local", "unreliable")
+func animar_recarga_en_red(tiempo: float):
+	var remitente := multiplayer.get_remote_sender_id()
+	if remitente != 0 and remitente != get_multiplayer_authority(): return
+	if not animador or _rapidez_anim > 0.4: return
+	var nombre := "rifle_recarga" if _modelo_arma == "Shotgun" else "pistola_recarga"
+	if animador.has_animation(nombre):
+		animador.accion(nombre, tiempo, animador.get_animation(nombre).length / maxf(0.3, tiempo))
 
 # La escopeta va de la mano derecha hacia la izquierda, como la sostiene la animación.
 func _apuntar_arma_larga():
@@ -450,6 +479,7 @@ func recargar():
 	if municion_reserva[tipo] <= 0: return
 
 	esta_recargando = true
+	animar_recarga_en_red.rpc(arma_actual.tiempo_recarga / stat_destreza)
 	_id_recarga += 1
 	var mi_recarga := _id_recarga
 	var arma_recargando := arma_actual
@@ -595,6 +625,7 @@ func recibir_dano(cantidad: int):
 	salud_actual -= cantidad
 	actualizar_ui_vida()
 	if salud_actual <= 0: quedar_derribado()
+	elif animador and cantidad > 0: animador.accion("impacto", 0.3, 2.0)
 
 # --- NUEVO (mecánica de derribo/reanimación) ---
 # Antes esto era morir(): mataba al jugador al instante y disparaba el Game
