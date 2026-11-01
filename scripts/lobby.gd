@@ -44,6 +44,13 @@ var boton_volver: Button
 var boton_continuar: Button
 var _continuando: bool = false
 
+# Salas de la misma red Wi-Fi, encontradas solas (ver scripts/red/descubrimiento_lan.gd).
+var descubrimiento: DescubrimientoLan
+var caja_salas: VBoxContainer
+var titulo_salas: Label
+var _intento_conexion: int = 0  # para ignorar timeouts de intentos viejos
+const ESPERA_CONEXION := 8.0    # segundos antes de dar por fallida la conexión
+
 func _ready():
 	boton_iniciar.hide()
 
@@ -54,6 +61,7 @@ func _ready():
 
 	_crear_controles_nuevos()
 	_aplicar_estilo()
+	_iniciar_busqueda_lan()
 	# Con mando, el foco arranca en "Jugar solo / Crear partida".
 	if Controles.usando_mando: btn_host.grab_focus.call_deferred()
 
@@ -110,6 +118,18 @@ func _crear_controles_nuevos():
 	label_estado_sala.hide()
 	vbox.add_child(label_estado_sala)
 
+	# --- Salas encontradas en la red (se llena sola) ---
+	titulo_salas = Label.new()
+	titulo_salas.text = "Buscando partidas en tu Wi-Fi…"
+	titulo_salas.modulate = Color(1, 1, 1, 0.7)
+	vbox.add_child(titulo_salas)
+	vbox.move_child(titulo_salas, btn_unirse.get_index())
+	caja_salas = VBoxContainer.new()
+	caja_salas.add_theme_constant_override("separation", 6)
+	vbox.add_child(caja_salas)
+	vbox.move_child(caja_salas, btn_unirse.get_index())
+	input_ip.placeholder_text = "O escribe la IP del anfitrión (ej: 192.168.1.23)"
+
 	# --- Salida siempre disponible (antes no había forma de volver al menú) ---
 	boton_volver = Button.new()
 	boton_volver.text = "Volver al menú"
@@ -131,6 +151,51 @@ func _crear_controles_nuevos():
 		boton_continuar.text = "Continuar partida (Noche %d, %d jugador%s)" % [int(guardada.get("oleada", 1)), n_jugadores, "" if n_jugadores == 1 else "es"]
 
 	_actualizar_texto_boton_host()
+
+# ==========================================
+# SALAS EN LA MISMA RED
+# ==========================================
+func _iniciar_busqueda_lan():
+	descubrimiento = DescubrimientoLan.new()
+	add_child(descubrimiento)
+	descubrimiento.salas_cambiaron.connect(_mostrar_salas)
+	if not descubrimiento.escuchar():
+		titulo_salas.text = "No se pueden buscar salas solas: escribe la IP del anfitrión."
+
+func _mostrar_salas(salas: Array):
+	for hijo in caja_salas.get_children():
+		hijo.queue_free()
+	if salas.is_empty():
+		titulo_salas.text = "Buscando partidas en tu Wi-Fi…"
+		return
+	titulo_salas.text = "Partidas en tu Wi-Fi (toca para unirte):"
+	for sala in salas:
+		var b := Button.new()
+		var llena: bool = int(sala.jugadores) >= int(sala.maximo)
+		b.text = "%s   %d/%d%s" % [sala.nombre, sala.jugadores, sala.maximo, "  🔒" if sala.clave else ""]
+		b.disabled = llena
+		b.theme_type_variation = &"BotonPrimario"
+		b.custom_minimum_size = Vector2(0, 48)
+		b.pressed.connect(_unirse_a_sala.bind(sala))
+		caja_salas.add_child(b)
+
+func _unirse_a_sala(sala: Dictionary):
+	if sala.clave and input_contrasena_unirse.text == "":
+		_mostrar_error("Esa sala tiene contraseña: escríbela abajo y vuelve a tocarla.")
+		input_contrasena_unirse.grab_focus()
+		return
+	input_ip.text = sala.ip
+	_on_btn_unirse_pressed()
+
+func _anunciar_sala():
+	if not soy_host or cantidad_deseada <= 1 or sala_bloqueada: return
+	var info := {
+		"nombre": "Sala de " + str(EstadoPartida.protagonista(selector.id_actual()).get("nombre", "Superviviente")),
+		"jugadores": jugadores_conectados.size(),
+		"maximo": cantidad_deseada,
+		"clave": contrasena_sala != "",
+	}
+	descubrimiento.anunciar(info)
 
 func _poner_cantidad(n: int):
 	cantidad_deseada = clampi(n, 1, MAX_CLIENTS)
@@ -228,6 +293,7 @@ func _volver_al_menu():
 	multiplayer.multiplayer_peer = null
 	EstadoPartida.ids_iniciales = []
 	EstadoPartida.personajes = {}
+	if descubrimiento: descubrimiento.queue_free()
 	get_tree().change_scene_to_file("res://scenes/menu_principal.tscn")
 
 func _unhandled_input(event):
@@ -255,6 +321,7 @@ func _on_btn_host_pressed():
 
 	soy_host = true
 	contrasena_sala = input_contrasena_crear.text
+	descubrimiento.dejar_de_escuchar()
 	print("¡Servidor Host creado! Esperando a los muchachos... (sala de ", cantidad_deseada, ")")
 
 	# EL HOST SE REGISTRA A SÍ MISMO (El Host SIEMPRE es el ID 1)
@@ -263,6 +330,7 @@ func _on_btn_host_pressed():
 	EstadoPartida.asignar_personaje(1, selector.id_actual())
 	actualizar_ui_lobby()
 	_actualizar_estado_sala()
+	_anunciar_sala()
 
 	esconder_menu_conexion()
 
@@ -271,9 +339,10 @@ func _on_btn_host_pressed():
 		_on_boton_iniciar_juego_pressed()
 
 func _on_btn_unirse_pressed():
-	var ip = input_ip.text
+	var ip = input_ip.text.strip_edges()
 	if ip == "":
-		ip = "127.0.0.1"
+		_mostrar_error("Toca una partida de la lista o escribe la IP que ve el anfitrión en su pantalla.")
+		return
 
 	var error = peer.create_client(ip, EstadoPartida.PUERTO_RED)
 	if error != OK:
@@ -292,8 +361,22 @@ func _on_btn_unirse_pressed():
 
 	print("Conectando a la IP: ", ip, "...")
 	esconder_menu_conexion()
+	label_estado_sala.show()
+	label_estado_sala.remove_theme_color_override("font_color")
+	label_estado_sala.text = "Conectando a %s…" % ip
+	# Sin esto, ENet tarda ~30 s en rendirse y parece que el juego se colgó.
+	_intento_conexion += 1
+	var intento := _intento_conexion
+	await get_tree().create_timer(ESPERA_CONEXION).timeout
+	if intento == _intento_conexion and not jugadores_conectados.has(multiplayer.get_unique_id()) \
+			and multiplayer.multiplayer_peer == peer \
+			and peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		peer.close()
+		_on_falla_de_conexion()
 
 func esconder_menu_conexion():
+	if titulo_salas: titulo_salas.hide()
+	if caja_salas: caja_salas.hide()
 	btn_host.hide()
 	btn_unirse.hide()
 	input_ip.hide()
@@ -303,6 +386,8 @@ func esconder_menu_conexion():
 	input_contrasena_unirse.hide()
 
 func _mostrar_menu_conexion():
+	if titulo_salas: titulo_salas.show()
+	if caja_salas: caja_salas.show()
 	btn_host.show()
 	btn_unirse.show()
 	input_ip.show()
@@ -326,6 +411,7 @@ func _on_peer_disconnected(id):
 		jugadores_conectados.erase(id)
 		EstadoPartida.personajes.erase(id)
 		_repartir_lista()
+		_anunciar_sala()
 
 func _on_conectado_al_servidor():
 	print("Conectado a nivel de red -- pidiendo entrar a la sala...")
@@ -335,7 +421,12 @@ func _on_conectado_al_servidor():
 
 func _on_falla_de_conexion():
 	print("Error de conexión. ¿El Host está activo?")
-	_mostrar_error("No se encontró la sala.\n¿El anfitrión ya la creó y están en la misma red?")
+	_intento_conexion += 1
+	_mostrar_error("No se pudo conectar con la sala. Revisa que:\n" +
+		"• el anfitrión ya haya creado la partida;\n" +
+		"• estén en la misma Wi-Fi (no la de invitados);\n" +
+		"• la IP sea la que ve el anfitrión en su pantalla;\n" +
+		"• en PC, Windows deje pasar el juego en el firewall.")
 	peer = ENetMultiplayerPeer.new()
 	multiplayer.multiplayer_peer = null
 	_mostrar_menu_conexion()
@@ -372,6 +463,7 @@ func solicitar_entrar_a_sala(id_solicitante: int, nombre: String, contrasena_ing
 	EstadoPartida.asignar_personaje(id_solicitante, personaje)
 	informar_cantidad_deseada.rpc_id(id_solicitante, cantidad_deseada)
 	_repartir_lista()
+	_anunciar_sala()
 
 func _rechazar_conexion(id_solicitante: int, motivo: String) -> void:
 	print("Jugador ", id_solicitante, " rechazado: ", motivo)
@@ -422,6 +514,11 @@ func _actualizar_estado_sala():
 	label_estado_sala.show()
 	label_estado_sala.remove_theme_color_override("font_color")
 	label_estado_sala.text = "Sala: %d/%d jugadores" % [jugadores_conectados.size(), cantidad_deseada]
+	# El anfitrión ve su IP por si la lista automática no funciona en esa red.
+	if soy_host and cantidad_deseada > 1 and multiplayer.multiplayer_peer is ENetMultiplayerPeer:
+		var ips := DescubrimientoLan.ips_locales()
+		label_estado_sala.text += "\nTus amigos te ven en su lista. Si no, que escriban: %s" % (", ".join(ips) if not ips.is_empty() else "(sin Wi-Fi)")
+		label_estado_sala.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 	if soy_host:
 		var antes: bool = boton_iniciar.visible
@@ -438,6 +535,7 @@ func _on_boton_iniciar_juego_pressed():
 	if jugadores_conectados.size() < cantidad_deseada:
 		return  # por si el botón quedó visible por un frame de más
 	sala_bloqueada = true
+	if descubrimiento: descubrimiento.dejar_de_anunciar()
 
 	# --- FIX (Sala con cupo fijo) ---
 	# mundo.gd necesita saber quiénes estaban legítimamente en la sala al
