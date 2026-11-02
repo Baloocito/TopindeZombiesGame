@@ -85,7 +85,8 @@ static func ruta_modelo(nombre: String) -> String:
 
 static func personaje(nombre: String) -> Node3D:
 	var base := ruta_modelo(nombre)
-	var escena = load(base + ".fbx")
+	# .fbx (Mixamo) o .glb (Tripo con esqueleto de Mixamo), con la textura .png al lado.
+	var escena = load(base + ".fbx") if ResourceLoader.exists(base + ".fbx") else load(base + ".glb")
 	if not escena: return Node3D.new()
 	var p := escena.instantiate() as Node3D
 	var tex = load(base + ".png")
@@ -130,7 +131,9 @@ static func personaje(nombre: String) -> Node3D:
 	var escala := ALTO_PERSONAJE / maxf(0.01, alto)
 	p.scale = Vector3.ONE * escala
 	p.position = Vector3(0, -piso * escala, 0)
-	p.rotation.y = PI
+	# Los .fbx de Mixamo llegan mirando a -Z; los .glb ya miran a +Z (el
+	# frente del personaje en el juego).
+	p.rotation.y = PI if ResourceLoader.exists(base + ".fbx") else 0.0
 	raiz.add_child(p)
 	return raiz
 

@@ -6,6 +6,7 @@ mostrar el progreso a quien quiera apoyar el proyecto.
 | Devlog | Fecha | Lo principal |
 |---|---|---|
 | [#1](2026-10-26_devlog_01/README.md) | 26 oct 2026 | Campaña de 20 noches, 4 jefes, estilo PS1, mejoras visibles, controles |
+| [#2](2026-11-02_devlog_02/README.md) | 2 nov 2026 | Arte propio: 4 protagonistas, horda y jefes, 9 armas, 6 defensas, selector y mando |
 
 ## Qué trae cada devlog
 

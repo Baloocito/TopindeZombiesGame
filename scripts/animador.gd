@@ -46,6 +46,9 @@ static func para(raiz: Node3D, conjunto: String) -> Animador:
 	raiz.add_child(a)
 	a.root_node = NodePath("..")
 	if esq:
+		# Las pistas apuntan a "Skeleton3D:<hueso>": la raíz es el padre del
+		# esqueleto (en los .glb queda un nivel más adentro, bajo "Armature").
+		if esq.get_parent() != raiz: a.root_node = a.get_path_to(esq.get_parent())
 		a.add_animation_library("", _libreria(conjunto, esq))
 	a.playback_default_blend_time = 0.18
 	return a

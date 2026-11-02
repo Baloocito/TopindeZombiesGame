@@ -26,6 +26,10 @@ Opciones (después de `--`):
 | `vallas` | Cuántas vallas construir en círculo | `vallas=8` |
 | `previos` | Zombies extra al empezar (modo horda) | `previos=18` |
 | `radio`, `giro` | Radio y velocidad de las vueltas del jugador demo | `radio=5 giro=0.45` |
+| `personaje` | Protagonista (id de `data/personajes.json` → `protagonistas`) | `personaje=miyuki` |
+| `fov` | Campo de visión de la cámara: más bajo = más cerca | `fov=24` |
+| `escena=arsenal` | Cambia de arma cada `cada` segundos (las 9 armas) | `escena=arsenal cada=1.4` |
+| `escena=defensas` | Construye un anillo con las 6 estructuras | `escena=defensas` |
 
 3. Borra `tools_tmp/` al terminar.
 

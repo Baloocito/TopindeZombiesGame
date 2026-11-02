@@ -1,12 +1,13 @@
 extends Node
 # Graba gameplay con un "jugador demo" (se mueve en círculo y dispara solo).
-# Uso: godot --write-movie out.avi --fixed-fps 30 res://tools_tmp/video.tscn -- noche=5 duracion=9 escena=jefe|horda
+# Uso: godot --write-movie out.avi --fixed-fps 30 res://tools_tmp/grabar_video.tscn -- noche=5 duracion=9 escena=jefe|horda
 var args := {}
 var m
 var j
 var t := 0.0
 var duracion := 9.0
 var iniciado := false
+const _arsenal := ["pistola", "clavos", "smg", "escopeta", "rifle_caza", "ballesta", "lanzallamas", "minigun", "riel"]
 func _ready():
 	for a in OS.get_cmdline_user_args():
 		var p = a.split("=", true, 1)
@@ -14,6 +15,8 @@ func _ready():
 	duracion = float(args.get("duracion", "9"))
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	EstadoPartida.ids_iniciales = [1]
+	if args.has("personaje"): EstadoPartida.personajes[1] = args["personaje"]
+	if args.has("zoom"): PS1.cambiar_zoom(args["zoom"])
 	m = load("res://scenes/mundo.tscn").instantiate()
 	get_tree().root.add_child.call_deferred(m)
 
@@ -47,6 +50,22 @@ func _physics_process(delta):
 		m.iniciar_oleada_en_red()
 		for n in m.get_node("InterfazUI").get_children():
 			if n is MedidorRendimiento: n.visible = false
+		if args.get("escena", "") == "defensas":
+			var tipos := ["madera", "puas", "acero", "electrico", "barril", "torreta", "madera", "puas"]
+			m.dinero_global = 99999
+			for k in 8:
+				var ang3 = TAU * k / 8.0
+				var p3 = Vector3(cos(ang3) * 4.6, 0, sin(ang3) * 4.6)
+				m.solicitar_construccion(tipos[k], m._llave_celda(p3), p3, 1.0)
+			m.dinero_global = int(args.get("oro", "1240"))
+			m.actualizar_dinero_para_todos(m.dinero_global)
+			get_tree().create_timer(0.05).timeout.connect(func():
+				if is_instance_valid(m._caja_avisos):
+					for av in m._caja_avisos.get_children(): av.queue_free())
+		if args.get("escena", "") == "arsenal":
+			for id in _arsenal:
+				var w = Balance.crear_arma(id)
+				j.armas_inventario.append(w)
 		if args.get("escena", "") == "horda":
 			var gen0 = m.get_node("GeneradorZombies")
 			for i in int(args.get("previos", "14")):
@@ -65,6 +84,17 @@ func _physics_process(delta):
 			# un poco de escolta
 			for i in int(args.get("escolta", "4")):
 				gen.crear_enemigo(["basico", "corredor"][i % 2], gen.punto_aleatorio())
+	if iniciado and args.has("fov"):
+		var cam := get_viewport().get_camera_3d()
+		if cam: cam.fov = float(args["fov"])
+	if iniciado and args.get("escena", "") == "arsenal":
+		var cada := float(args.get("cada", "1.5"))
+		var i := int((t - 0.6) / cada) % _arsenal.size()
+		if j.arma_actual == null or j.arma_actual.id != _arsenal[i]:
+			for w in j.armas_inventario:
+				if w.id == _arsenal[i]:
+					j.equipar_en_slot(w, 0); j.cambiar_arma(0)
+					break
 	if iniciado:
 		# Bot: da vueltas, apunta al enemigo más cercano y dispara.
 		var radio := float(args.get("radio", "5"))
