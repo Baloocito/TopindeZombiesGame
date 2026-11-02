@@ -19,3 +19,11 @@ assets/modelos/_fuentes/
 # Modelos de Tripo: mapas PBR que el juego no usa y modelos todavía sin esqueleto
 assets/modelos/KH/_extra/
 assets/modelos/KH/sin_rig/
+
+# Carpetas donde TopinGames deja los modelos tal como salen de Tripo/Mixamo.
+# Lo que usa el juego se copia ordenado a KH/, armas_kh/ y estructuras_kh/.
+assets/modelos/Armas/
+assets/modelos/Protagonistas/
+assets/modelos/Zombies/
+assets/modelos/estructuras/
+assets/modelos/Chained_Demon/
