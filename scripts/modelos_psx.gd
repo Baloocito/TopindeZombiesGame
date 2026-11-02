@@ -133,3 +133,86 @@ static func personaje(nombre: String) -> Node3D:
 	p.rotation.y = PI
 	raiz.add_child(p)
 	return raiz
+
+# ----------------------------------------------------------
+# ARMAS PROPIAS (assets/modelos/armas_kh, hechas en Tripo por TopinGames)
+# ----------------------------------------------------------
+# Por arma: giro en Y que lleva el cañón del modelo original a -Z, largo real
+# en metros, si se sostiene con las dos manos y dónde va la mano (fracción
+# del largo medida desde atrás).
+const RUTA_ARMAS := "res://assets/modelos/armas_kh/"
+const ARMAS := {
+	"pistola":     {"giro": 90.0,  "largo": 0.26, "dos_manos": false, "mano": 0.25},
+	"clavos":      {"giro": -90.0, "largo": 0.38, "dos_manos": false, "mano": 0.45},
+	"smg":         {"giro": -90.0, "largo": 0.6,  "dos_manos": true,  "mano": 0.4},
+	"escopeta":    {"giro": -90.0, "largo": 0.9,  "dos_manos": true,  "mano": 0.3},
+	"rifle_caza":  {"giro": 90.0,  "largo": 1.1,  "dos_manos": true,  "mano": 0.3},
+	"ballesta":    {"giro": 180.0, "largo": 0.75, "dos_manos": true,  "mano": 0.3},
+	"lanzallamas": {"giro": -90.0, "largo": 0.95, "dos_manos": true,  "mano": 0.3},
+	"minigun":     {"giro": -90.0, "largo": 0.95, "dos_manos": true,  "mano": 0.35},
+	"riel":        {"giro": 180.0, "largo": 0.9,  "dos_manos": true,  "mano": 0.3},
+}
+
+static func tiene_arma(id: String) -> bool:
+	return ARMAS.has(id) and ResourceLoader.exists(RUTA_ARMAS + id + ".glb")
+
+static func arma_dos_manos(id: String) -> bool:
+	return bool(ARMAS.get(id, {}).get("dos_manos", false))
+
+# El arma con el cañón hacia -Z, arriba +Y y la empuñadura en el origen.
+# `largo` < 0 usa el largo real de la tabla.
+static func arma(id: String, largo: float = -1.0) -> Node3D:
+	var datos: Dictionary = ARMAS.get(id, {"giro": 0.0, "largo": 0.5, "mano": 0.3})
+	return _modelo_glb(RUTA_ARMAS + id + ".glb", float(datos.giro), largo if largo > 0.0 else float(datos.largo), float(datos.mano), "largo")
+
+# Modelo .glb girado `giro` grados en Y, escalado para que su lado `medida`
+# ("largo" = Z tras el giro, "alto" = Y, "ancho" = X) mida `tamano`, centrado
+# en X, apoyado en Y = 0 (o a media altura si es un arma) y con el origen a
+# `fraccion_z` del largo contando desde atrás.
+static func _modelo_glb(ruta: String, giro: float, tamano: float, fraccion_z: float, medida: String) -> Node3D:
+	var raiz := Node3D.new()
+	raiz.name = "Modelo"
+	var escena = load(ruta)
+	if not escena: return raiz
+	var n := escena.instantiate() as Node3D
+	var gir := Node3D.new()
+	gir.rotation_degrees.y = giro
+	gir.add_child(n)
+	raiz.add_child(gir)
+	# Caja del modelo en el espacio del nodo girado.
+	var caja := AABB()
+	var primera := true
+	var rot := Basis(Vector3.UP, deg_to_rad(giro))
+	for m in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		var t := Transform3D()
+		var x: Node = mi
+		while x and x != n:
+			t = (x as Node3D).transform * t
+			x = x.get_parent()
+		var b: AABB = Transform3D(rot, Vector3.ZERO) * (t * mi.get_aabb())
+		caja = b if primera else caja.merge(b)
+		primera = false
+	var lado := caja.size.z
+	if medida == "alto": lado = caja.size.y
+	elif medida == "ancho": lado = maxf(caja.size.x, caja.size.z)
+	var escala := tamano / maxf(0.001, lado)
+	gir.scale = Vector3.ONE * escala
+	var centro := caja.get_center()
+	var y := -caja.position.y if medida != "largo" else -centro.y
+	var z := -(caja.end.z - caja.size.z * fraccion_z) if medida == "largo" else -centro.z
+	gir.position = Vector3(-centro.x, y, z) * escala
+	return raiz
+
+# ----------------------------------------------------------
+# ESTRUCTURAS PROPIAS (assets/modelos/estructuras_kh)
+# ----------------------------------------------------------
+const RUTA_ESTRUCTURAS := "res://assets/modelos/estructuras_kh/"
+
+static func tiene_estructura(id: String) -> bool:
+	return ResourceLoader.exists(RUTA_ESTRUCTURAS + id + ".glb")
+
+# La estructura apoyada en el suelo, centrada y con su lado más ancho (X o Z)
+# midiendo `ancho` metros.
+static func estructura(id: String, ancho: float, giro: float = 0.0) -> Node3D:
+	return _modelo_glb(RUTA_ESTRUCTURAS + id + ".glb", giro, ancho, 0.5, "ancho")

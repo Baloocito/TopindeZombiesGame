@@ -296,6 +296,8 @@ var _modelo_arma := "Pistol_variant_two"
 var _arma_visual: Node3D = null
 var _mano_der: BoneAttachment3D = null
 var _mano_izq: BoneAttachment3D = null
+var _espalda: BoneAttachment3D = null
+var _tanque_espalda: Node3D = null
 var _pos_previa_anim := Vector3.INF
 var _rapidez_anim := 0.0
 var _estaba_caido := false
@@ -339,6 +341,9 @@ func _crear_modelo():
 		_mano_izq = BoneAttachment3D.new()
 		_mano_izq.bone_name = "mixamorig_LeftHand"
 		esq.add_child(_mano_izq)
+		_espalda = BoneAttachment3D.new()
+		_espalda.bone_name = "mixamorig_Spine2"
+		esq.add_child(_espalda)
 	animador.poner("pistola_reposo")
 	if has_node("MeshInstance3D"): $MeshInstance3D.visible = false  # la cápsula queda solo como colisión
 
@@ -357,7 +362,7 @@ func _process(delta: float) -> void:
 		_rapidez_anim = lerpf(_rapidez_anim, v, minf(1.0, delta * 10.0))
 	_pos_previa_anim = p
 	_apuntar_arma_larga()
-	var arma := "rifle" if _modelo_arma == "Shotgun" else "pistola"
+	var arma := "rifle" if _arma_larga() else "pistola"
 	if _rapidez_anim <= 0.4:
 		animador.poner(arma + "_reposo")
 		return
@@ -386,17 +391,33 @@ func animar_recarga_en_red(tiempo: float):
 	var remitente := multiplayer.get_remote_sender_id()
 	if remitente != 0 and remitente != get_multiplayer_authority(): return
 	if not animador or _rapidez_anim > 0.4: return
-	var nombre := "rifle_recarga" if _modelo_arma == "Shotgun" else "pistola_recarga"
+	var nombre := "rifle_recarga" if _arma_larga() else "pistola_recarga"
 	if animador.has_animation(nombre):
 		animador.accion(nombre, tiempo, animador.get_animation(nombre).length / maxf(0.3, tiempo))
 
-# La escopeta va de la mano derecha hacia la izquierda, como la sostiene la animación.
+# Armas que se sostienen con las dos manos (animaciones de rifle).
+func _arma_larga() -> bool:
+	if _modelo_arma == "Shotgun": return true
+	return _modelo_arma.begins_with("kh:") and ModelosPSX.arma_dos_manos(_modelo_arma.substr(3))
+
+# El arma va en la mano derecha. Las largas apuntan hacia la mano izquierda
+# (como las sostiene la animación); las cortas, hacia donde mira el jugador.
+# Las armas propias (kh:) se colocan siempre así; la pistola del pack PSX
+# queda fija en la mano.
 func _apuntar_arma_larga():
-	if _modelo_arma != "Shotgun" or not is_instance_valid(_arma_visual) or not _mano_izq: return
+	if not is_instance_valid(_arma_visual) or not _mano_der: return
+	var propia := _modelo_arma.begins_with("kh:")
+	if not propia and _modelo_arma != "Shotgun": return
 	var a := _mano_der.global_position
-	var dir := _mano_izq.global_position - a
-	if dir.length() < 0.05: return
-	_arma_visual.global_transform = Transform3D(Basis.looking_at(dir.normalized(), Vector3.UP), a)
+	var adelante := global_basis.z.normalized()
+	var dir := adelante
+	if _arma_larga() and _mano_izq:
+		var hacia_izq := _mano_izq.global_position - a
+		if hacia_izq.length() > 0.05 and hacia_izq.normalized().dot(adelante) > 0.2:
+			dir = hacia_izq.normalized()
+	_arma_visual.global_transform = Transform3D(Basis.looking_at(dir, Vector3.UP), a)
+	if is_instance_valid(_tanque_espalda) and _espalda:
+		_tanque_espalda.global_transform = Transform3D(Basis.looking_at(-adelante, Vector3.UP), _espalda.global_position - adelante * 0.17 + Vector3(0, -0.38, 0))
 
 # ----------------------------------------------------------
 # ARMA EN LA MANO (modelos del PSX Asset Pack 3)
@@ -404,6 +425,7 @@ func _apuntar_arma_larga():
 var _arma_visual_en_red_lista := false
 func _modelo_de_arma(arma: ArmaData) -> String:
 	if not arma: return ""
+	if ModelosPSX.tiene_arma(arma.id): return "kh:" + arma.id
 	match arma.tipo_municion:
 		"Pesada": return "Shotgun"
 		"Energia": return "Lower_poly_pistol_variant"
@@ -416,9 +438,29 @@ func arma_visual_en_red(modelo: String):
 	if remitente != 0 and remitente != get_multiplayer_authority(): return
 	var vieja = _arma_visual
 	if is_instance_valid(vieja): vieja.free()
+	if is_instance_valid(_tanque_espalda): _tanque_espalda.free()
 	_arma_visual = null
+	_tanque_espalda = null
 	_modelo_arma = modelo
 	if modelo == "": return
+	if modelo.begins_with("kh:"):
+		# Arma propia: hija del jugador, se coloca cada cuadro en la mano
+		# (ver _apuntar_arma_larga). Sin modelo animado, frente al pecho.
+		var id := modelo.substr(3)
+		var propia := ModelosPSX.arma(id)
+		propia.name = "ArmaVisual"
+		add_child(propia)
+		if not _mano_der:
+			propia.position = Vector3(-0.3, 1.0, 0.35)
+			propia.rotation.y = PI
+		_arma_visual = propia
+		# El lanzallamas lleva su tanque en la espalda.
+		if id == "lanzallamas" and ResourceLoader.exists(ModelosPSX.RUTA_ARMAS + "lanzallamas_tanque.glb"):
+			_tanque_espalda = ModelosPSX._modelo_glb(ModelosPSX.RUTA_ARMAS + "lanzallamas_tanque.glb", 0.0, 0.55, 0.5, "alto")
+			_tanque_espalda.name = "TanqueEspalda"
+			add_child(_tanque_espalda)
+			if not _espalda: _tanque_espalda.position = Vector3(0, 0.9, -0.3)
+		return
 	# Largo real en metros (personajes de 1,8 m).
 	var largo := (0.85 if modelo == "Shotgun" else 0.3) if _mano_der else (1.0 if modelo == "Shotgun" else 0.45)
 	var arma := ModelosPSX.objeto(modelo, largo)

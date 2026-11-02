@@ -27,6 +27,38 @@ var alineado_para_disparar: bool = false
 # ==========================================================
 func _ready():
 	super._ready()
+	_poner_modelo()
+
+# Modelo propio (assets/modelos/estructuras_kh/torreta.glb): las piezas de
+# abajo quedan fijas como base y las de arriba pasan al Cabezal, que gira
+# hacia el zombie (el frente del cabezal es su +Z, ver apuntar_a_objetivo).
+const ANCHO_TORRETA := 1.8
+const GIRO_TORRETA := 0.0   # giro del modelo para que su cañón mire al +Z del cabezal
+func _poner_modelo():
+	if not ModelosPSX.tiene_estructura("torreta"): return
+	var base := get_node_or_null("Base") as MeshInstance3D
+	var base_y := 0.0
+	if base and base.mesh is BoxMesh: base_y = base.position.y - (base.mesh as BoxMesh).size.y * 0.5
+	if base: base.visible = false
+	var malla_cabezal := cabezal.get_node_or_null("MeshInstance3D") as MeshInstance3D
+	if malla_cabezal: malla_cabezal.visible = false
+	var m := ModelosPSX.estructura("torreta", ANCHO_TORRETA, GIRO_TORRETA)
+	m.position.y = base_y
+	add_child(m)
+	var alto := 0.0
+	var piezas: Array = []
+	for mi in m.find_children("*", "MeshInstance3D", true, false):
+		var caja: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb() if mi.is_inside_tree() else AABB()
+		piezas.append([mi, caja])
+		alto = maxf(alto, caja.end.y - global_position.y)
+	for p in piezas:
+		var caja: AABB = p[1]
+		if caja.position.y - global_position.y > alto * 0.33:
+			var mi: MeshInstance3D = p[0]
+			var t := mi.global_transform
+			mi.get_parent().remove_child(mi)
+			cabezal.add_child(mi)
+			mi.global_transform = t
 
 func _physics_process(delta):
 	# --- FIX (revisión de código) ---

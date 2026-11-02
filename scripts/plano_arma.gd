@@ -55,7 +55,13 @@ func _poner_modelo(color: Color):
 	if vieja: vieja.free()
 	var tipo := str(Balance.arma(arma_id_contenida).get("municion", "Ligera"))
 	var nombre := "Shotgun" if tipo == "Pesada" else "Pistol_variant_one"
-	var modelo := ModelosPSX.objeto(nombre, 1.3 if nombre == "Shotgun" else 0.75)
+	var modelo: Node3D
+	if ModelosPSX.tiene_arma(arma_id_contenida):
+		# Arma propia, un poco más grande que en la mano para que se lea en el suelo.
+		modelo = ModelosPSX.arma(arma_id_contenida, 1.1 if ModelosPSX.arma_dos_manos(arma_id_contenida) else 0.6)
+		modelo.position.y = 0.35
+	else:
+		modelo = ModelosPSX.objeto(nombre, 1.3 if nombre == "Shotgun" else 0.75)
 	if has_node("MeshInstance3D"):
 		$MeshInstance3D.visible = false
 		modelo.position.y = $MeshInstance3D.position.y - 0.2

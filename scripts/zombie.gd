@@ -62,6 +62,10 @@ var _t_impacto := 0.0
 var _pos_previa := Vector3.INF
 var _rapidez := 0.0
 
+# true si el modelo es arte propio de TopinGames (KH/): ya trae su color, así
+# que no se tiñe (salvo la Mosca Despertada, que comparte modelo con la normal).
+var arte_propio := false
+
 func _crear_modelo(contenedor: Node3D):
 	var rol: String = ROL_POR_TIPO.get(tipo_zombie, "basico")
 	var lista: Array = ModelosPSX.roles().get(rol, [])
@@ -71,6 +75,7 @@ func _crear_modelo(contenedor: Node3D):
 	# El mismo nombre de nodo en todas las pantallas => el mismo modelo.
 	var nombre_modelo: String = lista[absi(hash(String(name))) % lista.size()]
 	var p := ModelosPSX.personaje(nombre_modelo)
+	arte_propio = nombre_modelo.begins_with("KH/")
 	contenedor.add_child(p)
 	animador = Animador.para(p.get_child(0), "jefe" if tipo_zombie in TIPOS_JEFE_ANIM else "zombie")
 	animador.poner("reposo")
@@ -145,9 +150,10 @@ func _aplicar_aspecto():
 	# en los tipos rápidos; el tipo se conoce en todas las pantallas.
 	if modelo and modelo.get_child_count() == 0:
 		_crear_modelo(modelo)
-	if modelo and tipo_zombie == "basico":
+	if modelo and tipo_zombie == "basico" and not arte_propio:
 		PS1.aplicar_tinte(modelo, Color("#7f9c6b"), 0.3)
 	if not datos.has("color") or not modelo: return
+	if arte_propio and tipo_zombie != "mosca_titan_plus": return
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(datos["color"], 0.45)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -159,7 +165,7 @@ func _aplicar_aspecto():
 		for m in modelo.find_children("*", "MeshInstance3D", true, false):
 			(m as MeshInstance3D).material_overlay = mat
 	# La Mosca Titán lleva una placa al frente: la armadura que obliga a flanquear.
-	if tipo_zombie.begins_with("mosca_titan"):
+	if tipo_zombie.begins_with("mosca_titan") and not arte_propio:
 		var placa := MeshInstance3D.new()
 		var caja := BoxMesh.new()
 		caja.size = Vector3(0.5, 0.42, 0.08)

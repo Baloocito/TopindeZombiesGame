@@ -7,7 +7,13 @@ animaciones de `assets/animaciones/mixamo` les sirven a todos.
 | Carpeta | Uso en el juego |
 | --- | --- |
 | `leo/`, `frank/`, `miyuki/`, `momo/` | Protagonistas (selector del lobby, `data/personajes.json` → `protagonistas`) |
-| `tanque/` | Zombie tanque |
+| `leo_v2/`, `miyuki_v2/`, `momo_v2/` | Diseños nuevos de los protagonistas (los primeros quedan elegibles en el selector) |
+| `zombie_base/`, `corredor/`, `explosivo/`, `tanque/`, `tanque_v2/` | Zombies comunes |
+| `acechador/`, `mosca/`, `hospedero/` | Jefes (la Mosca Despertada usa `mosca/` teñida) |
+
+Armas: `assets/modelos/armas_kh/<id>.glb` (id de `data/armas.json`); la orientación
+y el largo de cada una están en `ModelosPSX.ARMAS`. Estructuras:
+`assets/modelos/estructuras_kh/<id>.glb` (id de `data/estructuras.json`).
 
 ## Agregar uno nuevo
 
